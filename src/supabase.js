@@ -3,7 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = 'https://kufdjzdlsggkwaprabqe.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1ZmRqemRsc2dna3dhcHJhYnFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMDIzOTUsImV4cCI6MjA5NTU3ODM5NX0.K6xXcMyCEAAAaIBL5bvGkE78key6uqukpClQB7evuGg'
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  }
+})
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 export const signUp = (email, password, name) =>
@@ -65,7 +71,7 @@ export const db = {
     supabase.from('goals').insert(goal).select().single(),
 
   updateGoal: (id, updates) =>
-    supabase.from('goals').update(updates).eq('id', id),
+    supabase.from('goals').update(updates).eq('id', id).select().single(),
 
   deleteGoal: (id) =>
     supabase.from('goals').delete().eq('id', id),

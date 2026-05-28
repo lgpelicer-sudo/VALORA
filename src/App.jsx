@@ -721,6 +721,8 @@ export default function Valora() {
   const [addType,setAddType]             = useState("expense");
   const [showVoiceSheet,setShowVoiceSheet] = useState(false);
   const [showShared,setShowShared]       = useState(false);
+  const [showNotifSheet,setShowNotifSheet] = useState(false);
+  const [showSecuritySheet,setShowSecuritySheet] = useState(false);
   const [showPremium,setShowPremium]     = useState(false);
   const [showCheckout,setShowCheckout]   = useState(false);
   const [filterMonth,setFilterMonth]     = useState(new Date().getMonth());
@@ -753,14 +755,20 @@ export default function Valora() {
       if (session?.user) {
         setAuthUser(session.user);
         loadFromSupabase(session.user);
-      } else {
-        setShowAuth(true);
+        setShowAuth(false);
       }
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session)=>{
-      if (session?.user) { setAuthUser(session.user); setShowAuth(false); }
-      else { setAuthUser(null); setShowAuth(true); }
+      if (session?.user) {
+        setAuthUser(session.user);
+        setShowAuth(false);
+        setAuthLoading(false);
+      } else {
+        setAuthUser(null);
+        // Only show auth if initial loading is already done (avoid flicker on startup)
+        setAuthLoading(prev => { if (!prev) setShowAuth(true); return false; });
+      }
     });
     return ()=>subscription.unsubscribe();
   },[]); // eslint-disable-line
@@ -844,18 +852,7 @@ export default function Valora() {
     setUserName(""); setUserEmail("");
   };
 
-  // ── Loading / Auth screen ──────────────────────────────────────────────────
-  if (authLoading) return (
-    <div style={{background:T.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:40,marginBottom:12}}>💚</div>
-        <p style={{color:T.textMuted,fontFamily:T.font,fontSize:14}}>Carregando...</p>
-      </div>
-    </div>
-  );
-
-  if (showAuth) return <AuthScreen onAuth={handleAuth}/>;
-
+  // ── Todos os hooks ANTES de qualquer return condicional (Rules of Hooks) ────
   const notify = (msg, type="success") => { setNotification({msg,type}); setTimeout(()=>setNotification(null),3000); };
 
   const monthTx = useMemo(()=>transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===filterMonth&&d.getFullYear()===filterYear;}),[transactions,filterMonth,filterYear]);
@@ -875,14 +872,11 @@ export default function Valora() {
 
   const agentContext = useMemo(()=>({transactions,bills,goals,userName,filterMonth,filterYear}),[transactions,bills,goals,userName,filterMonth,filterYear]);
 
-  const handleAgentQuery = useCallback((query)=>{
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const voice = useValoraVoice({ onResult: useCallback((query)=>{
     const response = processValoraQuery(query, agentContext);
     setAgentResponse(response);
-    voice.speak(response);
-  },[agentContext]);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const voice = useValoraVoice({ onResult: handleAgentQuery });
+  },[agentContext]) });
 
   // Briefing proativo ao abrir
   useEffect(()=>{
@@ -981,6 +975,18 @@ export default function Valora() {
     setSharedKey(code);
     notify("Conectado ao modo casal! 🎉");
   };
+  // ── Render condicional (sem early returns — respeita Rules of Hooks) ─────────
+  if (authLoading) return (
+    <div style={{background:T.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:40,marginBottom:12}}>💚</div>
+        <p style={{color:T.textMuted,fontFamily:T.font,fontSize:14}}>Carregando...</p>
+      </div>
+    </div>
+  );
+
+  if (showAuth) return <AuthScreen onAuth={handleAuth}/>;
+
   if (isBlocked) return (
     <>
       <PaywallScreen trialDaysLeft={0} onSubscribe={()=>setShowCheckout(true)} />
@@ -1009,7 +1015,7 @@ export default function Valora() {
         {tab==="home"         && <HomeScreen balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} catData={catData} monthlyChart={monthlyChart} transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} userName={userName} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onDelete={deleteTransaction} onOpenAgent={()=>{setAgentResponse("");setShowAgent(true);}} rates={rates} lastUpdated={lastUpdated} onShowRelatorios={()=>setShowRelatorios(true)} />}
         {tab==="transactions" && <TransactionsScreen transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={deleteTransaction} />}
         {tab==="planejar"     && <PlanejamentoScreen bills={bills} setBills={setBills} goals={goals} setGoals={setGoals} notify={notify} />}
-        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} autoCatEnabled={autoCatEnabled} setAutoCatEnabled={setAutoCatEnabled} onSignOut={handleSignOut} />}
+        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} autoCatEnabled={autoCatEnabled} setAutoCatEnabled={setAutoCatEnabled} onSignOut={handleSignOut} onShowNotif={()=>setShowNotifSheet(true)} onShowSecurity={()=>setShowSecuritySheet(true)} transactions={transactions} bills={bills} goals={goals} />}
         {tab==="admin" && isAdmin && <AdminPanel allUsers={allUsers} />}
       </div>
 
@@ -1113,6 +1119,12 @@ export default function Valora() {
       </BottomSheet>
 
       <CheckoutSheet open={showCheckout} onClose={()=>setShowCheckout(false)} onSuccess={()=>{setIsPremium(true);setShowCheckout(false);notify("Premium ativado! 🎉");}} />
+
+      {/* NOTIFICAÇÕES */}
+      <NotifSheet open={showNotifSheet} onClose={()=>setShowNotifSheet(false)} bills={bills} />
+
+      {/* SEGURANÇA */}
+      <SecuritySheet open={showSecuritySheet} onClose={()=>setShowSecuritySheet(false)} userEmail={userEmail} />
     </div>
   );
 }
@@ -1291,11 +1303,20 @@ function CheckoutSheet({ open, onClose, onSuccess }) {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
-function AdminPanel({ allUsers }) {
+function AdminPanel({ allUsers: _unused }) {
   const [adminTab,setAdminTab]=useState("overview");
+  const [users,setUsers]=useState([]);
+  const [loadingUsers,setLoadingUsers]=useState(true);
+  React.useEffect(()=>{
+    supabase.from("profiles").select("*").then(({data,error})=>{
+      if(!error&&data) setUsers(data);
+      setLoadingUsers(false);
+    });
+  },[]);
+  const allUsers = users;
   const totalUsers=allUsers.length, premiumUsers=allUsers.filter(u=>u.premium).length;
   const monthlyRevenue=premiumUsers*14.90;
-  const activeToday=allUsers.filter(u=>u.lastActive===today()).length;
+  const activeToday=allUsers.filter(u=>u.last_active===today()||u.lastActive===today()).length;
   const growthData=MONTHS.map((m,i)=>({name:m,usuarios:Math.floor(20+i*12+Math.random()*15),premium:Math.floor(3+i*3+Math.random()*5)}));
   return (
     <div style={{padding:"0 16px 20px"}}>
@@ -1312,13 +1333,16 @@ function AdminPanel({ allUsers }) {
         <GlassCard style={{marginBottom:16}}><p style={{fontSize:11,color:T.textDim}}>Receita Mensal</p><p style={{fontFamily:T.fontDisplay,fontSize:28,fontWeight:800,color:T.gold}}>{fmt(monthlyRevenue)}</p><p style={{fontSize:12,color:T.textDim,marginTop:4}}>Conversão: {(premiumUsers/totalUsers*100).toFixed(1)}%</p></GlassCard>
         <GlassCard style={{padding:16}}><h3 style={{fontFamily:T.fontDisplay,fontSize:14,fontWeight:600,color:T.textMuted,marginBottom:12}}>Crescimento</h3><div style={{height:160}}><ResponsiveContainer><AreaChart data={growthData}><XAxis dataKey="name" tick={{fill:T.textDim,fontSize:10}} axisLine={false} tickLine={false}/><YAxis hide/><Tooltip contentStyle={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12}}/><Area type="monotone" dataKey="usuarios" stroke={T.accent} fill={T.accentSoft} strokeWidth={2}/><Area type="monotone" dataKey="premium" stroke={T.gold} fill={T.goldSoft} strokeWidth={2}/></AreaChart></ResponsiveContainer></div></GlassCard>
       </>)}
-      {adminTab==="users"&&allUsers.map((u,i)=>(
+      {adminTab==="users"&&(loadingUsers?<p style={{textAlign:"center",color:T.textDim,padding:16}}>Carregando...</p>:allUsers.length===0?<p style={{textAlign:"center",color:T.textDim,padding:16}}>Nenhum usuário cadastrado ainda</p>:allUsers.map((u,i)=>{
+        const displayName=u.name||u.full_name||u.email||"Usuário";
+        const isPrem=u.premium||u.is_premium||false;
+        return (
         <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px",marginBottom:6,background:T.card,borderRadius:T.radiusSm,border:`1px solid ${T.border}`}}>
-          <div style={{width:38,height:38,borderRadius:"50%",background:u.premium?`linear-gradient(135deg,${T.gold},#F59E0B)`:`linear-gradient(135deg,${T.accent},#6366F1)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:T.fontDisplay,fontSize:14,fontWeight:700,color:u.premium?"#000":"#fff",flexShrink:0}}>{u.name[0].toUpperCase()}</div>
-          <div style={{flex:1,minWidth:0}}><p style={{fontSize:13,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</p><p style={{fontSize:11,color:T.textDim}}>{u.email}</p></div>
-          <p style={{fontSize:10,color:u.premium?T.gold:T.textDim,fontWeight:600,flexShrink:0}}>{u.premium?"PREMIUM":"FREE"}</p>
-        </div>
-      ))}
+          <div style={{width:38,height:38,borderRadius:"50%",background:isPrem?`linear-gradient(135deg,${T.gold},#F59E0B)`:`linear-gradient(135deg,${T.accent},#6366F1)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:T.fontDisplay,fontSize:14,fontWeight:700,color:isPrem?"#000":"#fff",flexShrink:0}}>{displayName[0].toUpperCase()}</div>
+          <div style={{flex:1,minWidth:0}}><p style={{fontSize:13,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</p><p style={{fontSize:11,color:T.textDim}}>{u.email||""}</p></div>
+          <p style={{fontSize:10,color:isPrem?T.gold:T.textDim,fontWeight:600,flexShrink:0}}>{isPrem?"PREMIUM":"FREE"}</p>
+        </div>);
+      }))}
       {adminTab==="revenue"&&(
         <GlassCard><p style={{fontSize:11,color:T.textDim}}>Receita Mensal Estimada</p><p style={{fontFamily:T.fontDisplay,fontSize:28,fontWeight:800,color:T.gold}}>{fmt(monthlyRevenue)}</p><p style={{fontSize:12,color:T.textDim,marginTop:4}}>Anual estimado: {fmt(monthlyRevenue*12)}</p></GlassCard>
       )}
@@ -1389,6 +1413,11 @@ function AuthScreen({ onAuth }) {
     const { data, error: e } = await signUp(email.trim(), password, name.trim());
     setLoading(false);
     if (e) return setError(e.message);
+    // If no session, email confirmation is required
+    if (!data?.session) {
+      setError("Conta criada! Verifique seu e-mail para confirmar antes de entrar.");
+      return;
+    }
     if (data?.user) onAuth(data.user, name.trim());
   };
 
@@ -1397,7 +1426,12 @@ function AuthScreen({ onAuth }) {
     setLoading(true); setError("");
     const { data, error: e } = await signIn(email.trim(), password);
     setLoading(false);
-    if (e) return setError("E-mail ou senha incorretos.");
+    if (e) {
+      if (e.message?.includes('Email not confirmed')) {
+        return setError("Confirme seu e-mail primeiro. Verifique sua caixa de entrada.");
+      }
+      return setError("E-mail ou senha incorretos.");
+    }
     if (data?.user) onAuth(data.user, data.user.user_metadata?.name || email.split("@")[0]);
   };
 
@@ -1455,6 +1489,80 @@ function AuthScreen({ onAuth }) {
           </span>
         </p>
       </div>
+    </div>
+  );
+}
+
+
+// ── Notifications BottomSheet ─────────────────────────────────────────────────
+function NotifSheet({ open, onClose, bills }) {
+  const [pushEnabled, setPushEnabled] = React.useState(true);
+  const overdue = (bills||[]).filter(b=>b.active&&!b.paid);
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Notificações">
+      <div style={{padding:"4px 0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
+          <Bell size={18} color={T.gold}/>
+          <div style={{flex:1}}><p style={{fontSize:14,fontWeight:600}}>Notificações push</p><p style={{fontSize:12,color:T.textDim}}>Alertas de vencimentos e gastos</p></div>
+          <div onClick={()=>setPushEnabled(v=>!v)} style={{width:44,height:24,borderRadius:12,padding:2,cursor:"pointer",background:pushEnabled?T.accent:T.surfaceAlt,transition:"background 0.2s",flexShrink:0}}>
+            <div style={{width:20,height:20,borderRadius:10,background:"#fff",transform:pushEnabled?"translateX(20px)":"translateX(0)",transition:"transform 0.2s"}}/>
+          </div>
+        </div>
+        <p style={{fontSize:12,fontWeight:600,color:T.textMuted,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Alertas recentes</p>
+        {overdue.length===0
+          ? <p style={{fontSize:13,color:T.textDim,textAlign:"center",padding:"16px 0"}}>Nenhuma conta pendente</p>
+          : overdue.map((b,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
+                <Bell size={14} color={T.gold}/>
+                <div style={{flex:1}}><p style={{fontSize:13,fontWeight:600}}>{b.name}</p><p style={{fontSize:11,color:T.textDim}}>Vence dia {b.dueDay} • R$ {b.amount?.toFixed(2)}</p></div>
+              </div>
+            ))
+        }
+      </div>
+    </BottomSheet>
+  );
+}
+
+// ── Security BottomSheet ──────────────────────────────────────────────────────
+function SecuritySheet({ open, onClose, userEmail }) {
+  const [newPass, setNewPass] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+
+  const handleChangePass = async () => {
+    if (!newPass || newPass.length < 6) { setMsg("Senha deve ter ao menos 6 caracteres."); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPass });
+    setLoading(false);
+    if (error) setMsg("Erro: " + error.message);
+    else { setMsg("Senha alterada com sucesso!"); setNewPass(""); }
+  };
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Segurança">
+      <div style={{padding:"4px 0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",background:T.surfaceAlt,borderRadius:T.radiusSm,marginBottom:16}}>
+          <Shield size={16} color={"#3B82F6"}/>
+          <div><p style={{fontSize:12,color:T.textDim}}>Conta</p><p style={{fontSize:14,fontWeight:600}}>{userEmail||"—"}</p></div>
+        </div>
+        <p style={{fontSize:13,fontWeight:600,marginBottom:8}}>Alterar senha</p>
+        <Input placeholder="Nova senha (mín. 6 caracteres)" value={newPass} onChange={v=>setNewPass(v)} />
+        {msg&&<p style={{fontSize:12,color:msg.startsWith("Erro")?T.expense:T.income,margin:"8px 0"}}>{msg}</p>}
+        <Btn variant="accent" onClick={handleChangePass} style={{marginTop:12}} disabled={loading}>
+          {loading?"Salvando...":"Alterar Senha"}
+        </Btn>
+      </div>
+    </BottomSheet>
+  );
+}
+
+// ── Shared join input helper (local state avoids stale closure) ───────────────
+function JoinSharedInput({ onJoin }) {
+  const [code, setCode] = React.useState("");
+  return (
+    <div style={{display:"flex",gap:8,flexDirection:"column"}}>
+      <Input placeholder="Cole a chave aqui (VALORA-...)" value={code} onChange={v=>setCode(v)} />
+      <Btn variant="accent" onClick={()=>{if(code.trim())onJoin(code.trim());}}>Entrar na conta compartilhada</Btn>
     </div>
   );
 }
@@ -1559,7 +1667,7 @@ function TransactionsScreen({ transactions, filterMonth, setFilterMonth, searchQ
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
-function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab, autoCatEnabled, setAutoCatEnabled, onSignOut }) {
+function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab, autoCatEnabled, setAutoCatEnabled, onSignOut, onShowNotif, onShowSecurity, transactions, bills, goals }) {
   const [editName,setEditName]=useState(false); const [tempName,setTempName]=useState(userName);
   return (
     <div style={{padding:"0 16px 20px"}}>
@@ -1586,9 +1694,16 @@ function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium
       {[
         {icon:<Users size={18}/>,label:"Conta Compartilhada",desc:sharedKey?"Conectada":"Não configurada",color:T.accent,onClick:onShowShared},
         {icon:<Crown size={18}/>,label:"Valora Premium",desc:isPremium?"Ativo ✓":"R$ 14,90/mês",color:T.gold,onClick:onShowPremium},
-        {icon:<Shield size={18}/>,label:"Segurança",desc:"Biometria e criptografia",color:"#3B82F6"},
-        {icon:<Bell size={18}/>,label:"Notificações",desc:"Alertas de gastos e vencimentos",color:"#F59E0B"},
-        {icon:<Download size={18}/>,label:"Backup",desc:"Dados locais",color:"#10B981"},
+        {icon:<Shield size={18}/>,label:"Segurança",desc:"Biometria e criptografia",color:"#3B82F6",onClick:onShowSecurity},
+        {icon:<Bell size={18}/>,label:"Notificações",desc:"Alertas de gastos e vencimentos",color:"#F59E0B",onClick:onShowNotif},
+        {icon:<Download size={18}/>,label:"Backup",desc:"Dados locais",color:"#10B981",onClick:()=>{
+          const data={transactions,bills,goals,exportedAt:new Date().toISOString()};
+          const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");
+          a.href=url;a.download=`valora-backup-${new Date().toISOString().split("T")[0]}.json`;
+          document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+        }},
       ].map((item,i)=>(
         <GlassCard key={i} onClick={item.onClick} style={{marginBottom:8,cursor:item.onClick?"pointer":"default",padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1892,13 +2007,9 @@ function JotaOverlay({ open, onClose, listening, speaking, transcript, agentCont
             <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage(input)} placeholder="Pergunte algo..." style={{flex:1,background:"transparent",border:"none",outline:"none",color:T.text,fontFamily:T.font,fontSize:14}}/>
           </div>
           {supported && (
-            <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
-              {listening?<MicOff size={18} color="#fff"/>:<Mic size={18} color={T.textMuted}/>}
-            </div>
+            <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{listening?<MicOff size={20} color={T.expense}/>:<Mic size={20} color={T.textMuted}/>}</div>
           )}
-          <div onClick={()=>sendMessage(input)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${T.accent},${T.agent})`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,opacity:input.trim()?1:0.4}}>
-            <ArrowUpRight size={18} color="#fff"/>
-          </div>
+          <div onClick={()=>sendMessage(input)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${T.agent},#0891B2)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><Send size={18} color="#000"/></div>
         </div>
       </div>
     </div>
