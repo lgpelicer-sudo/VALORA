@@ -1,21 +1,35 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
-import { Mic, Camera, Plus, X, ChevronRight, ChevronLeft, Users, FileText, Shield, Crown, Home, BarChart3, Settings, Bell, Search, Calendar, Download, Check, CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, Copy, UserPlus, ShieldCheck, Target, MicOff, Volume2, TrendingUp, Activity, UserCheck } from "lucide-react";
+import { Mic, Camera, Plus, X, ChevronRight, ChevronLeft, Users, FileText, Shield, Crown, Home, BarChart3, Settings, Bell, Search, Calendar, Download, Check, CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, Copy, UserPlus, ShieldCheck, Target, MicOff, Volume2, TrendingUp, Activity, UserCheck, Zap } from "lucide-react";
 
 const ADMIN_EMAIL = "lgpelicer@gmail.com";
 
+// ── FEATURE 6 — NEO DARK DESIGN SYSTEM ───────────────────────────────────────
 const T = {
-  bg: "#0A0E17", surface: "#111827", surfaceAlt: "#1A2332",
-  card: "rgba(26,35,50,0.85)", border: "rgba(255,255,255,0.06)",
-  income: "#34D399", incomeSoft: "rgba(52,211,153,0.12)", incomeGlow: "rgba(52,211,153,0.25)",
-  expense: "#F87171", expenseSoft: "rgba(248,113,113,0.12)", expenseGlow: "rgba(248,113,113,0.25)",
-  accent: "#818CF8", accentSoft: "rgba(129,140,248,0.12)",
+  // Backgrounds Neo Dark
+  bg: "#0D0D14", surface: "#13131F", surfaceAlt: "#1A1A2E",
+  card: "rgba(19,19,31,0.90)", border: "rgba(109,40,217,0.18)",
+  // Receita / Despesa
+  income: "#34D399", incomeSoft: "rgba(52,211,153,0.10)", incomeGlow: "rgba(52,211,153,0.22)",
+  expense: "#F87171", expenseSoft: "rgba(248,113,113,0.10)", expenseGlow: "rgba(248,113,113,0.22)",
+  // Roxo escuro — primary accent
+  accent: "#6D28D9", accentAlt: "#8B5CF6", accentSoft: "rgba(109,40,217,0.14)",
+  accentGlow: "rgba(109,40,217,0.40)",
+  // Ciano elétrico — secondary accent
+  cyan: "#22D3EE", cyanSoft: "rgba(34,211,238,0.12)", cyanGlow: "rgba(34,211,238,0.28)",
+  // Gradiente principal (roxo → ciano)
+  grad: "linear-gradient(135deg,#4C1D95,#06B6D4)",
+  gradCard: "linear-gradient(135deg,rgba(76,29,149,0.16),rgba(6,182,212,0.06))",
+  // Gold / status
   gold: "#FBBF24", goldSoft: "rgba(251,191,36,0.12)",
-  text: "#F1F5F9", textMuted: "#94A3B8", textDim: "#64748B",
-  radius: "16px", radiusSm: "10px", radiusXs: "6px",
+  // Texto
+  text: "#F1F5F9", textMuted: "#94A3B8", textDim: "#4B5563",
+  // Radii & fonts
+  radius: "18px", radiusSm: "12px", radiusXs: "7px",
   font: "'DM Sans', sans-serif", fontDisplay: "'Outfit', sans-serif",
-  admin: "#A78BFA", adminSoft: "rgba(167,139,250,0.12)", adminGlow: "rgba(167,139,250,0.3)",
-  agent: "#22D3EE", agentSoft: "rgba(34,211,238,0.12)", agentGlow: "rgba(34,211,238,0.25)",
+  // Admin / Agent
+  admin: "#8B5CF6", adminSoft: "rgba(139,92,246,0.14)", adminGlow: "rgba(139,92,246,0.35)",
+  agent: "#22D3EE", agentSoft: "rgba(34,211,238,0.10)", agentGlow: "rgba(34,211,238,0.28)",
 };
 
 const CATEGORIES = {
@@ -40,6 +54,81 @@ const fmt = (v) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const fmtDate = (d) => new Date(d).toLocaleDateString("pt-BR");
 const uid = () => Math.random().toString(36).slice(2,10);
 const today = () => new Date().toISOString().split("T")[0];
+
+// ── FEATURE 3 — GUIABOLSO: AUTO-CATEGORIZAÇÃO ────────────────────────────────
+const AUTO_RULES = [
+  { patterns: ["amazon","shopee","mercado livre","magazine","americanas"], category: "vestuario" },
+  { patterns: ["uber","99","cabify","taxi","gasolina","combustivel","posto","onibus","metro"], category: "transporte" },
+  { patterns: ["ifood","rappi","restaurante","almoco","jantar","lanche","cafe","padaria","pizza"], category: "alimentacao" },
+  { patterns: ["netflix","spotify","prime","disney","hbo","cinema","steam","playstation","show"], category: "lazer" },
+  { patterns: ["farmacia","drogaria","remedio","medicamento","droga"], category: "farmacia" },
+  { patterns: ["mercado","supermercado","feira","hortifruti","atacadao","assai"], category: "mercado" },
+  { patterns: ["medico","consulta","hospital","dentista","exame","clinica","laboratorio"], category: "saude" },
+  { patterns: ["aluguel","condominio","luz","agua","internet","gas","iptu"], category: "moradia" },
+  { patterns: ["escola","faculdade","curso","livro","mensalidade","universidade"], category: "educacao" },
+  { patterns: ["salario","pagamento","contracheque","folha"], category: "salario" },
+  { patterns: ["freelance","projeto","servico","cliente","honorario"], category: "freelance" },
+  { patterns: ["investimento","dividendo","rendimento","juros","tesouro","fundo"], category: "investimento" },
+];
+function autoCategorize(description) {
+  if (!description) return null;
+  const d = description.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  for (const rule of AUTO_RULES) { if (rule.patterns.some(p => d.includes(p))) return rule.category; }
+  return null;
+}
+
+// ── WALLET: MULTIMOEDA ───────────────────────────────────────────────────────
+const CURRENCIES = {
+  BRL: { symbol: "R$", label: "Real",  flag: "🇧🇷", decimals: 2 },
+  USD: { symbol: "$",  label: "Dólar", flag: "🇺🇸", decimals: 2 },
+  EUR: { symbol: "€",  label: "Euro",  flag: "🇪🇺", decimals: 2 },
+  GBP: { symbol: "£",  label: "Libra", flag: "🇬🇧", decimals: 2 },
+  JPY: { symbol: "¥",  label: "Iene",  flag: "🇯🇵", decimals: 0 },
+};
+
+// Taxas fallback (1 moeda estrangeira = X BRL). Supabase atualiza a cada 6h quando configurado.
+const FALLBACK_RATES = { BRL: 1, USD: 5.10, EUR: 5.55, GBP: 6.40, JPY: 0.034 };
+
+function fmtCurrency(value, currency = "BRL") {
+  const c = CURRENCIES[currency] || CURRENCIES.BRL;
+  const n = Number(value) || 0;
+  const formatted = n.toFixed(c.decimals).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${c.flag} ${c.symbol} ${formatted}`;
+}
+
+function useExchangeRate() {
+  const [rates, setRates] = useState(FALLBACK_RATES);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  useEffect(() => {
+    // Tenta buscar taxas atualizadas da API pública (gratuita, sem key)
+    fetch("https://open.er-api.com/v6/latest/USD")
+      .then(r => r.json())
+      .then(data => {
+        if (data?.rates) {
+          const usdToBRL = data.rates.BRL || FALLBACK_RATES.USD;
+          setRates({
+            BRL: 1,
+            USD: usdToBRL,
+            EUR: usdToBRL / (data.rates.EUR || 1) * (data.rates.BRL || 1) / (data.rates.USD || 1),
+            GBP: usdToBRL / (data.rates.GBP || 1) * (data.rates.BRL || 1) / (data.rates.USD || 1),
+            JPY: usdToBRL / (data.rates.JPY || 1) * (data.rates.BRL || 1) / (data.rates.USD || 1),
+          });
+          setLastUpdated(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+        }
+      })
+      .catch(() => { /* usa fallback silenciosamente */ });
+  }, []);
+
+  const convert = useCallback((amount, from, to = "BRL") => {
+    if (from === to) return amount;
+    const inBRL = amount * (rates[from] || 1);
+    if (to === "BRL") return inBRL;
+    return inBRL / (rates[to] || 1);
+  }, [rates]);
+
+  return { rates, lastUpdated, convert };
+}
 function norm(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
 
 // ── NLP ENGINE ──────────────────────────────────────────────────────────────
@@ -279,13 +368,17 @@ const globalCSS = `
   @keyframes scaleIn  { from{transform:scale(0.8);opacity:0} to{transform:scale(1);opacity:1} }
   @keyframes spin     { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   @keyframes wave     { 0%,100%{height:6px} 50%{height:26px} }
+  @keyframes neoGlow  { 0%,100%{box-shadow:0 0 12px rgba(109,40,217,0.3)} 50%{box-shadow:0 0 24px rgba(34,211,238,0.4)} }
+  @keyframes shimmer  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  .neo-card { border:1px solid rgba(109,40,217,0.22) !important; transition:border-color 0.3s,box-shadow 0.3s; }
+  .neo-card:hover { border-color:rgba(34,211,238,0.35) !important; box-shadow:0 0 20px rgba(109,40,217,0.18); }
   .anim-item { animation:fadeUp 0.5s ease both; }
   .glass { backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); }
 `;
 
 // ── SHARED COMPONENTS ────────────────────────────────────────────────────────
 function GlassCard({ children, style, onClick }) {
-  return <div className="glass" onClick={onClick} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:"16px",...style}}>{children}</div>;
+  return <div className="glass neo-card" onClick={onClick} style={{background:T.card,borderRadius:T.radius,padding:"16px",...style}}>{children}</div>;
 }
 
 function BottomSheet({ open, onClose, title, children }) {
@@ -305,13 +398,13 @@ function BottomSheet({ open, onClose, title, children }) {
 function Btn({ children, variant="primary", onClick, style, disabled, icon }) {
   const base = {fontFamily:T.font,fontWeight:600,fontSize:14,border:"none",borderRadius:T.radiusSm,padding:"12px 20px",cursor:disabled?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.2s",opacity:disabled?0.5:1,width:"100%"};
   const v = {
-    primary:{background:`linear-gradient(135deg,${T.income},#059669)`,color:"#fff"},
+    primary:{background:T.grad,color:"#fff",boxShadow:`0 4px 18px ${T.accentGlow}`},
     danger: {background:`linear-gradient(135deg,${T.expense},#DC2626)`,color:"#fff"},
-    ghost:  {background:"transparent",color:T.textMuted,border:`1px solid ${T.border}`},
-    accent: {background:`linear-gradient(135deg,${T.accent},#6366F1)`,color:"#fff"},
+    ghost:  {background:"transparent",color:T.textMuted,border:`1px solid rgba(109,40,217,0.25)`},
+    accent: {background:`linear-gradient(135deg,${T.accent},${T.cyan})`,color:"#fff",boxShadow:`0 4px 16px ${T.accentGlow}`},
     gold:   {background:`linear-gradient(135deg,${T.gold},#F59E0B)`,color:"#000"},
-    admin:  {background:`linear-gradient(135deg,${T.admin},#7C3AED)`,color:"#fff"},
-    agent:  {background:`linear-gradient(135deg,${T.agent},#0891B2)`,color:"#000"},
+    admin:  {background:`linear-gradient(135deg,${T.admin},#4C1D95)`,color:"#fff"},
+    agent:  {background:`linear-gradient(135deg,${T.cyan},#0891B2)`,color:"#000"},
   };
   return <button disabled={disabled} onClick={onClick} style={{...base,...v[variant],...style}}>{icon}{children}</button>;
 }
@@ -340,12 +433,80 @@ function TabBar({ active, onChange, isAdmin }) {
   return (
     <div className="glass" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:900,background:"rgba(10,14,23,0.92)",borderTop:`1px solid ${T.border}`,display:"flex",padding:"6px 0 env(safe-area-inset-bottom,8px)"}}>
       {tabs.map(t=>(
-        <div key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 0",cursor:"pointer",color:active===t.id?(t.id==="admin"?T.admin:T.income):T.textDim}}>
+        <div key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 0",cursor:"pointer",color:active===t.id?(t.id==="admin"?T.admin:T.cyan):T.textDim}}>
           {t.icon}
           <span style={{fontSize:9,fontFamily:T.font,fontWeight:active===t.id?600:400}}>{t.label}</span>
-          {active===t.id && <div style={{width:4,height:4,borderRadius:2,background:t.id==="admin"?T.admin:T.income,marginTop:1}} />}
+          {active===t.id && <div style={{width:4,height:4,borderRadius:2,background:t.id==="admin"?T.admin:T.cyan,marginTop:1}} />}
         </div>
       ))}
+    </div>
+  );
+}
+
+function CurrencySelector({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const cur = CURRENCIES[value] || CURRENCIES.BRL;
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  return (
+    <div ref={ref} style={{position:"relative",marginBottom:12}}>
+      <label style={{fontFamily:T.font,fontSize:12,color:T.textMuted,marginBottom:6,display:"block",fontWeight:500}}>Moeda</label>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,background:T.surfaceAlt,borderRadius:T.radiusSm,border:`1px solid ${open?T.accent:T.border}`,padding:"12px",cursor:"pointer",transition:"border-color 0.2s"}}>
+        <span style={{fontSize:18}}>{cur.flag}</span>
+        <span style={{fontFamily:T.font,fontSize:15,color:T.text,fontWeight:500}}>{value} — {cur.label}</span>
+        <span style={{marginLeft:"auto",color:T.textDim,fontSize:12}}>▾</span>
+      </div>
+      {open && (
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.radiusSm,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",marginTop:4}}>
+          {Object.entries(CURRENCIES).map(([code,c])=>(
+            <div key={code} onClick={()=>{onChange(code);setOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",background:value===code?T.accentSoft:"transparent",borderBottom:`1px solid ${T.border}`,transition:"background 0.15s"}}>
+              <span style={{fontSize:18}}>{c.flag}</span>
+              <span style={{fontFamily:T.font,fontSize:14,color:T.text,fontWeight:value===code?600:400}}>{code}</span>
+              <span style={{fontSize:13,color:T.textDim}}>{c.label}</span>
+              {value===code && <span style={{marginLeft:"auto",color:T.accent,fontSize:12}}>✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CurrencyBadge({ currency }) {
+  if (!currency || currency === "BRL") return null;
+  const c = CURRENCIES[currency];
+  if (!c) return null;
+  return (
+    <span style={{fontSize:9,fontWeight:700,fontFamily:T.font,padding:"2px 5px",borderRadius:4,background:T.accentSoft,color:T.accent,border:`1px solid ${T.accent}40`,marginLeft:4,verticalAlign:"middle"}}>
+      {c.flag} {currency}
+    </span>
+  );
+}
+
+function ExchangeRateBar({ rates, lastUpdated }) {
+  const currencies = [
+    { code: "USD", ...CURRENCIES.USD },
+    { code: "EUR", ...CURRENCIES.EUR },
+    { code: "GBP", ...CURRENCIES.GBP },
+    { code: "JPY", ...CURRENCIES.JPY },
+  ];
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:0,padding:"8px 16px",background:T.surfaceAlt,borderRadius:T.radiusSm,marginBottom:12,overflowX:"auto",border:`1px solid ${T.border}`}}>
+      {currencies.map((c,i)=>(
+        <div key={c.code} style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,paddingRight:i<currencies.length-1?14:0,marginRight:i<currencies.length-1?14:0,borderRight:i<currencies.length-1?`1px solid ${T.border}`:"none"}}>
+          <span style={{fontSize:14}}>{c.flag}</span>
+          <div>
+            <span style={{fontSize:10,color:T.textDim,fontFamily:T.font}}>{c.code} </span>
+            <span style={{fontSize:12,fontWeight:700,color:T.text,fontFamily:T.fontDisplay}}>{fmt(rates[c.code]||FALLBACK_RATES[c.code])}</span>
+          </div>
+        </div>
+      ))}
+      {lastUpdated && <span style={{marginLeft:"auto",fontSize:9,color:T.textDim,flexShrink:0,paddingLeft:8}}>🕐 {lastUpdated}</span>}
     </div>
   );
 }
@@ -360,8 +521,13 @@ function TransactionItem({ tx, onDelete, delay=0 }) {
         <p style={{fontSize:14,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</p>
         <p style={{fontSize:11,color:T.textDim,marginTop:2}}>{fmtDate(tx.date)} • {tx.user}</p>
       </div>
-      <p style={{fontSize:14,fontWeight:700,fontFamily:T.fontDisplay,color:isIncome?T.income:T.expense,flexShrink:0}}>{isIncome?"+":"-"}{fmt(tx.value)}</p>
-      <X size={14} color={T.textDim} style={{cursor:"pointer",flexShrink:0}} onClick={e=>{e.stopPropagation();onDelete(tx.id);}} />
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,flexShrink:0}}>
+        <p style={{fontSize:14,fontWeight:700,fontFamily:T.fontDisplay,color:isIncome?T.income:T.expense}}>{isIncome?"+":"-"}{fmt(tx.valueInBRL??tx.value)}</p>
+        {tx.currency && tx.currency !== "BRL" && (
+          <span style={{fontSize:10,color:T.textDim,fontFamily:T.font}}>{fmtCurrency(tx.value, tx.currency)}<CurrencyBadge currency={tx.currency}/></span>
+        )}
+      </div>
+      <X size={14} color={T.textDim} style={{cursor:"pointer",flexShrink:0,marginLeft:4}} onClick={e=>{e.stopPropagation();onDelete(tx.id);}} />
     </div>
   );
 }
@@ -457,6 +623,61 @@ function AgentFAB({ onClick, speaking, listening }) {
   );
 }
 
+// ── DATA GENERATORS ──────────────────────────────────────────────────────────
+function generateSampleBills() {
+  return [
+    {id:uid(),name:"Aluguel",      amount:1500,dueDay:5, category:"moradia",  active:true,paid:false},
+    {id:uid(),name:"Internet",     amount:120, dueDay:10,category:"moradia",  active:true,paid:false},
+    {id:uid(),name:"Netflix",      amount:45,  dueDay:15,category:"lazer",    active:true,paid:true},
+    {id:uid(),name:"Conta de Luz", amount:180, dueDay:20,category:"moradia",  active:true,paid:false},
+    {id:uid(),name:"Academia",     amount:99,  dueDay:8, category:"saude",    active:true,paid:false},
+  ];
+}
+
+function generateSampleGoals() {
+  return [
+    {id:uid(),name:"Reserva de emergência",target:10000,current:3200,deadline:"2026-12-31",icon:"🏦"},
+    {id:uid(),name:"Viagem nas férias",    target:4000, current:900, deadline:"2026-07-15",icon:"✈️"},
+  ];
+}
+
+function generateSampleData() {
+  const data=[]; const now=new Date(); const m=now.getMonth(); const y=now.getFullYear();
+  const expenses=[
+    {cat:"alimentacao",desc:"Almoço restaurante",min:25,max:80},
+    {cat:"alimentacao",desc:"iFood delivery",    min:20,max:60},
+    {cat:"mercado",    desc:"Supermercado",       min:80,max:450},
+    {cat:"transporte", desc:"Uber",               min:12,max:45},
+    {cat:"transporte", desc:"Gasolina",           min:100,max:300},
+    {cat:"moradia",    desc:"Aluguel",            min:1500,max:1500},
+    {cat:"moradia",    desc:"Conta de luz",       min:80,max:250},
+    {cat:"moradia",    desc:"Internet",           min:120,max:120},
+    {cat:"saude",      desc:"Consulta médica",    min:150,max:350},
+    {cat:"farmacia",   desc:"Medicamentos",       min:30,max:120},
+    {cat:"lazer",      desc:"Netflix",            min:45,max:45},
+    {cat:"lazer",      desc:"Cinema",             min:30,max:80},
+    {cat:"educacao",   desc:"Curso online",       min:50,max:200},
+    {cat:"vestuario",  desc:"Roupas",             min:50,max:300},
+  ];
+  const incomes=[
+    {cat:"salario",    desc:"Salário",            min:5000,max:5000},
+    {cat:"freelance",  desc:"Projeto freelance",  min:500,max:2000},
+    {cat:"investimento",desc:"Rendimento",        min:50,max:300},
+  ];
+  for (let pm=0;pm<=5;pm++) {
+    const cm=(m-pm+12)%12; const cy=m-pm<0?y-1:y;
+    incomes.forEach(inc=>{
+      if (Math.random()>0.3) data.push({id:uid(),type:"income",value:inc.min+Math.floor(Math.random()*(inc.max-inc.min)),category:inc.cat,description:inc.desc,user:Math.random()>0.8?"Maria":"Você",date:`${cy}-${String(cm+1).padStart(2,"0")}-${String(Math.floor(Math.random()*20)+1).padStart(2,"0")}`,timestamp:Date.now()});
+    });
+    const count=pm===0?14:8+Math.floor(Math.random()*8);
+    for (let i=0;i<count;i++) {
+      const exp=expenses[Math.floor(Math.random()*expenses.length)];
+      data.push({id:uid(),type:"expense",value:exp.min+Math.floor(Math.random()*(exp.max-exp.min)),category:exp.cat,description:exp.desc,user:Math.random()>0.7?"Maria":"Você",date:`${cy}-${String(cm+1).padStart(2,"0")}-${String(Math.floor(Math.random()*28)+1).padStart(2,"0")}`,timestamp:Date.now()});
+    }
+  }
+  return data.sort((a,b)=>new Date(b.date)-new Date(a.date));
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function Valora() {
   const [tab,setTab] = useState("home");
@@ -482,12 +703,17 @@ export default function Valora() {
   const [voiceText,setVoiceText]         = useState("");
   const [isListeningLegacy,setIsListeningLegacy] = useState(false);
   const [formValue,setFormValue]   = useState("");
+  const [formCurrency,setFormCurrency] = useState("BRL");
   const [formCategory,setFormCategory] = useState("outros");
   const [formDesc,setFormDesc]     = useState("");
   const [formDate,setFormDate]     = useState(today());
+  const [autoDetected,setAutoDetected] = useState(null);
+  const [autoCatEnabled,setAutoCatEnabled] = useState(()=>loadData("valora_autocat",true));
+  const { rates, lastUpdated, convert } = useExchangeRate();
   const [allUsers]                 = useState(()=>loadData("valora_all_users",generateSimulatedUsers()));
   const [showAgent,setShowAgent]   = useState(false);
   const [agentResponse,setAgentResponse] = useState("");
+  const [showRelatorios,setShowRelatorios] = useState(false);
   const briefingDone = useRef(false);
 
   const isAdmin = userEmail.toLowerCase()===ADMIN_EMAIL;
@@ -501,22 +727,23 @@ export default function Valora() {
   useEffect(()=>{ saveData("valora_user",userName); },[userName]);
   useEffect(()=>{ saveData("valora_email",userEmail); },[userEmail]);
   useEffect(()=>{ saveData("valora_premium",isPremium); },[isPremium]);
+  useEffect(()=>{ saveData("valora_autocat",autoCatEnabled); },[autoCatEnabled]);
 
   const notify = (msg, type="success") => { setNotification({msg,type}); setTimeout(()=>setNotification(null),3000); };
 
   const monthTx = useMemo(()=>transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===filterMonth&&d.getFullYear()===filterYear;}),[transactions,filterMonth,filterYear]);
-  const totalIncome  = useMemo(()=>monthTx.filter(t=>t.type==="income").reduce((s,t)=>s+t.value,0),[monthTx]);
-  const totalExpense = useMemo(()=>monthTx.filter(t=>t.type==="expense").reduce((s,t)=>s+t.value,0),[monthTx]);
+  const totalIncome  = useMemo(()=>monthTx.filter(t=>t.type==="income").reduce((s,t)=>s+(t.valueInBRL??t.value),0),[monthTx]);
+  const totalExpense = useMemo(()=>monthTx.filter(t=>t.type==="expense").reduce((s,t)=>s+(t.valueInBRL??t.value),0),[monthTx]);
   const balance = totalIncome-totalExpense;
 
   const catData = useMemo(()=>{
-    const map={}; monthTx.filter(t=>t.type==="expense").forEach(t=>{map[t.category]=(map[t.category]||0)+t.value;});
+    const map={}; monthTx.filter(t=>t.type==="expense").forEach(t=>{map[t.category]=(map[t.category]||0)+(t.valueInBRL??t.value);});
     return Object.entries(map).map(([k,v])=>({name:CATEGORIES[k]?.label||k,value:v,color:CATEGORIES[k]?.color||"#94A3B8",key:k})).sort((a,b)=>b.value-a.value);
   },[monthTx]);
 
   const monthlyChart = useMemo(()=>MONTHS.map((m,i)=>{
     const mt=transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===i&&d.getFullYear()===filterYear;});
-    return {name:m,receitas:mt.filter(t=>t.type==="income").reduce((s,t)=>s+t.value,0),despesas:mt.filter(t=>t.type==="expense").reduce((s,t)=>s+t.value,0)};
+    return {name:m,receitas:mt.filter(t=>t.type==="income").reduce((s,t)=>s+(t.valueInBRL??t.value),0),despesas:mt.filter(t=>t.type==="expense").reduce((s,t)=>s+(t.valueInBRL??t.value),0)};
   }),[transactions,filterYear]);
 
   const agentContext = useMemo(()=>({transactions,bills,goals,userName,filterMonth,filterYear}),[transactions,bills,goals,userName,filterMonth,filterYear]);
@@ -567,16 +794,19 @@ export default function Valora() {
   };
 
   const addTransaction = (tx) => {
-    setTransactions(prev=>[{id:uid(),date:tx.date||today(),...tx,user:userName||"Você",timestamp:Date.now()},...prev]);
-    notify(tx.type==="income"?`+${fmt(tx.value)} registrado!`:`${fmt(tx.value)} registrado!`,tx.type==="income"?"success":"expense");
+    const currency = tx.currency || "BRL";
+    const valueInBRL = currency === "BRL" ? tx.value : convert(tx.value, currency, "BRL");
+    setTransactions(prev=>[{id:uid(),date:tx.date||today(),...tx,currency,valueInBRL,user:userName||"Você",timestamp:Date.now()},...prev]);
+    const displayVal = currency === "BRL" ? fmt(tx.value) : `${fmtCurrency(tx.value, currency)} (${fmt(valueInBRL)})`;
+    notify(tx.type==="income"?`+${displayVal} registrado!`:`${displayVal} registrado!`,tx.type==="income"?"success":"expense");
   };
   const deleteTransaction = (id) => { setTransactions(prev=>prev.filter(t=>t.id!==id)); notify("Transação removida","info"); };
 
   const handleFormSubmit = () => {
     const val = parseFloat(formValue.replace(",","."));
     if (!val||val<=0) { notify("Valor inválido","error"); return; }
-    addTransaction({type:addType,value:val,category:formCategory,description:formDesc||CATEGORIES[formCategory]?.label,date:formDate});
-    setFormValue("");setFormDesc("");setFormCategory("outros");setFormDate(today());setShowAddSheet(false);
+    addTransaction({type:addType,value:val,currency:formCurrency,category:formCategory,description:formDesc||CATEGORIES[formCategory]?.label,date:formDate});
+    setFormValue("");setFormCurrency("BRL");setFormDesc("");setFormCategory("outros");setFormDate(today());setAutoDetected(null);setShowAddSheet(false);
   };
 
   const handleLegacyVoice = () => {
@@ -619,7 +849,7 @@ export default function Valora() {
           <span onClick={()=>setShowPremium(true)} style={{fontSize:12,fontWeight:700,color:"#000",cursor:"pointer",textDecoration:"underline"}}>Assinar agora →</span>
         </div>
       )}
-      <div style={{position:"fixed",top:"-30%",left:"-20%",width:"140%",height:"60%",background:`radial-gradient(ellipse at 30% 50%, ${isAdmin?T.adminGlow:T.incomeGlow} 0%, transparent 60%)`,pointerEvents:"none",zIndex:0,opacity:0.4}} />
+      <div style={{position:"fixed",top:"-30%",left:"-20%",width:"140%",height:"60%",background:`radial-gradient(ellipse at 20% 40%, ${isAdmin?T.adminGlow:T.accentGlow} 0%, transparent 55%), radial-gradient(ellipse at 80% 60%, ${T.cyanGlow} 0%, transparent 50%)`,pointerEvents:"none",zIndex:0,opacity:0.4}} />
 
       {notification && (
         <div style={{position:"fixed",top:16,left:16,right:16,zIndex:3000,padding:"14px 16px",borderRadius:T.radiusSm,background:notification.type==="success"?T.income:notification.type==="expense"?T.expense:notification.type==="error"?"#EF4444":T.accent,color:"#fff",fontFamily:T.font,fontWeight:600,fontSize:14,animation:"slideDown 0.3s ease",display:"flex",alignItems:"center",gap:8,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
@@ -628,22 +858,22 @@ export default function Valora() {
       )}
 
       <div style={{position:"relative",zIndex:1}}>
-        {tab==="home"         && <HomeScreen balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} catData={catData} monthlyChart={monthlyChart} transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} userName={userName} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onDelete={deleteTransaction} onOpenAgent={()=>{setAgentResponse("");setShowAgent(true);}} />}
+        {tab==="home"         && <HomeScreen balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} catData={catData} monthlyChart={monthlyChart} transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} userName={userName} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onDelete={deleteTransaction} onOpenAgent={()=>{setAgentResponse("");setShowAgent(true);}} rates={rates} lastUpdated={lastUpdated} onShowRelatorios={()=>setShowRelatorios(true)} />}
         {tab==="transactions" && <TransactionsScreen transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={deleteTransaction} />}
         {tab==="planejar"     && <PlanejamentoScreen bills={bills} setBills={setBills} goals={goals} setGoals={setGoals} notify={notify} />}
-        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} />}
+        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} autoCatEnabled={autoCatEnabled} setAutoCatEnabled={setAutoCatEnabled} />}
         {tab==="admin" && isAdmin && <AdminPanel allUsers={allUsers} />}
       </div>
 
-      <AgentFAB onClick={()=>{setAgentResponse("");setShowAgent(true);}} speaking={voice.speaking} listening={voice.listening} />
-      <div onClick={()=>setShowAddSheet(true)} style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",zIndex:950,width:56,height:56,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:`linear-gradient(135deg,${T.income},${T.accent})`,cursor:"pointer",boxShadow:`0 4px 24px ${T.incomeGlow}`,border:`3px solid ${T.bg}`}}><Plus size={28} color="#fff"/></div>
+      {showRelatorios && <RelatoriosScreen transactions={transactions} onClose={()=>setShowRelatorios(false)}/>}
+      <AgentFAB onClick={()=>setShowAgent(true)} speaking={voice.speaking} listening={voice.listening} />
+      <div onClick={()=>setShowAddSheet(true)} style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",zIndex:950,width:56,height:56,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:T.grad,cursor:"pointer",boxShadow:`0 4px 24px ${T.accentGlow}`,border:`3px solid ${T.bg}`}}><Plus size={28} color="#fff"/></div>
 
       <TabBar active={tab} onChange={setTab} isAdmin={isAdmin} />
 
-      <AgentOverlay open={showAgent} onClose={()=>{setShowAgent(false);window.speechSynthesis?.cancel();}}
+      <JotaOverlay open={showAgent} onClose={()=>setShowAgent(false)}
         listening={voice.listening} speaking={voice.speaking} transcript={voice.transcript}
-        agentResponse={agentResponse} onListen={voice.listen} onStop={voice.stop}
-        onTextSubmit={q=>{setAgentResponse("");handleAgentQuery(q);}} supported={voice.supported} />
+        agentContext={agentContext} onListen={voice.listen} onStop={voice.stop} supported={voice.supported} />
 
       {/* ADD TRANSACTION */}
       <BottomSheet open={showAddSheet} onClose={()=>setShowAddSheet(false)} title="Nova Transação">
@@ -652,8 +882,15 @@ export default function Valora() {
             <div key={x.t} onClick={()=>setAddType(x.t)} style={{flex:1,padding:"10px",borderRadius:T.radiusSm,textAlign:"center",background:addType===x.t?x.c+"20":T.surfaceAlt,border:`2px solid ${addType===x.t?x.c:T.border}`,color:addType===x.t?x.c:T.textMuted,fontFamily:T.font,fontWeight:600,fontSize:14,cursor:"pointer"}}>{x.l}</div>
           ))}
         </div>
-        <Input label="Valor (R$)" value={formValue} onChange={setFormValue} type="number" placeholder="0,00" icon={<DollarSign size={16}/>} />
-        <Input label="Descrição" value={formDesc} onChange={setFormDesc} placeholder="Ex: Almoço no restaurante" icon={<FileText size={16}/>} />
+        <CurrencySelector value={formCurrency} onChange={setFormCurrency} />
+        <Input label={`Valor (${formCurrency})`} value={formValue} onChange={setFormValue} type="number" placeholder="0,00" icon={<DollarSign size={16}/>} />
+        {formCurrency !== "BRL" && formValue && parseFloat(formValue) > 0 && (
+          <div style={{background:T.accentSoft,border:`1px solid ${T.accent}30`,borderRadius:T.radiusXs,padding:"8px 12px",marginBottom:12,fontSize:12,color:T.accent,fontFamily:T.font}}>
+            ≈ {fmt(convert(parseFloat(formValue.replace(",",".")), formCurrency, "BRL"))} em reais
+          </div>
+        )}
+        <Input label="Descrição" value={formDesc} onChange={v=>{ setFormDesc(v); if(autoCatEnabled){ const cat=autoCategorize(v); if(cat){setFormCategory(cat);setAutoDetected(cat);}else setAutoDetected(null); }}} placeholder="Ex: Almoço no restaurante" icon={<FileText size={16}/>} />
+        {autoDetected && <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",marginBottom:8,borderRadius:T.radiusXs,background:T.accentSoft,border:`1px solid ${T.accent}30`,fontSize:12,color:T.accent}}><span style={{fontSize:14}}>{CATEGORIES[autoDetected]?.icon}</span>Detectado: <strong>{CATEGORIES[autoDetected]?.label}</strong></div>}
         <Input label="Data" value={formDate} onChange={setFormDate} type="date" icon={<Calendar size={16}/>} />
         <label style={{fontFamily:T.font,fontSize:12,color:T.textMuted,marginBottom:8,display:"block",fontWeight:500}}>Categoria</label>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
@@ -1016,7 +1253,7 @@ function OnboardingScreen({ onDone }) {
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-function HomeScreen({ balance, totalIncome, totalExpense, catData, monthlyChart, transactions, filterMonth, setFilterMonth, userName, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onDelete, onOpenAgent }) {
+function HomeScreen({ balance, totalIncome, totalExpense, catData, monthlyChart, transactions, filterMonth, setFilterMonth, userName, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onDelete, onOpenAgent, rates, lastUpdated, onShowRelatorios }) {
   return (
     <div style={{padding:"0 16px 20px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0 12px"}}>
@@ -1027,6 +1264,8 @@ function HomeScreen({ balance, totalIncome, totalExpense, catData, monthlyChart,
         </div>
       </div>
 
+      <ExchangeRateBar rates={rates} lastUpdated={lastUpdated} />
+
       {/* Agent Card */}
       <div className="anim-item" onClick={onOpenAgent} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:16,background:`linear-gradient(135deg,${T.agentSoft},rgba(34,211,238,0.04))`,borderRadius:T.radiusSm,border:`1px solid ${T.agent}30`,cursor:"pointer"}}>
         <div style={{width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${T.agent},#0891B2)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 0 12px ${T.agentGlow}`}}><span style={{fontSize:20}}>🤖</span></div>
@@ -1035,7 +1274,7 @@ function HomeScreen({ balance, totalIncome, totalExpense, catData, monthlyChart,
       </div>
 
       <div className="anim-item" style={{animationDelay:"0.05s"}}>
-        <GlassCard style={{background:`linear-gradient(135deg,rgba(52,211,153,0.08),rgba(129,140,248,0.08))`,border:`1px solid ${T.incomeGlow}`,padding:"20px",marginBottom:16}}>
+        <GlassCard style={{background:T.gradCard,padding:"20px",marginBottom:16}}>
           <p style={{fontSize:12,color:T.textMuted,fontWeight:500,marginBottom:4}}>Saldo do Mês</p>
           <h2 style={{fontFamily:T.fontDisplay,fontSize:32,fontWeight:800,color:balance>=0?T.income:T.expense,marginBottom:12}}>{fmt(balance)}</h2>
           <div style={{display:"flex",gap:12}}>
@@ -1070,8 +1309,15 @@ function HomeScreen({ balance, totalIncome, totalExpense, catData, monthlyChart,
         </GlassCard>
       </div>
 
+      {sharedKey && <CoupleView transactions={transactions} sharedKey={sharedKey} userName={userName}/>}
+
       <div className="anim-item" style={{animationDelay:"0.25s"}}>
-        <h3 style={{fontFamily:T.fontDisplay,fontSize:14,fontWeight:600,marginBottom:12,color:T.textMuted}}>Últimas Transações</h3>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <h3 style={{fontFamily:T.fontDisplay,fontSize:14,fontWeight:600,color:T.textMuted}}>Últimas Transações</h3>
+          <div onClick={onShowRelatorios} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:T.accent,cursor:"pointer",fontWeight:600,padding:"4px 10px",borderRadius:20,background:T.accentSoft}}>
+            <TrendingUp size={12}/>Relatórios
+          </div>
+        </div>
         {transactions.slice(0,8).map((t,i)=><TransactionItem key={t.id} tx={t} onDelete={onDelete} delay={i*0.03}/>)}
         {transactions.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:T.textDim}}><p style={{fontSize:14}}>Nenhuma transação este mês</p></div>}
       </div>
@@ -1106,7 +1352,7 @@ function TransactionsScreen({ transactions, filterMonth, setFilterMonth, searchQ
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
-function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab }) {
+function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab, autoCatEnabled, setAutoCatEnabled }) {
   const [editName,setEditName]=useState(false); const [tempName,setTempName]=useState(userName);
   return (
     <div style={{padding:"0 16px 20px"}}>
@@ -1122,6 +1368,14 @@ function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium
         </div>
       </GlassCard>
       {isAdmin&&(<GlassCard onClick={onAdminTab} style={{marginBottom:12,cursor:"pointer",border:`1px solid ${T.admin}25`,background:T.adminSoft}}><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:36,height:36,borderRadius:T.radiusXs,background:T.admin+"20",display:"flex",alignItems:"center",justifyContent:"center"}}><ShieldCheck size={18} color={T.admin}/></div><div style={{flex:1}}><p style={{fontSize:14,fontWeight:600,color:T.admin}}>Painel Administrativo</p><p style={{fontSize:12,color:T.textDim}}>Métricas, usuários e receita</p></div><ChevronRight size={16} color={T.admin}/></div></GlassCard>)}
+      {/* Auto-categorização toggle — Feature 3 GuiaBolso */}
+      <GlassCard style={{marginBottom:8,padding:"14px 16px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:T.radiusXs,background:T.cyanSoft,display:"flex",alignItems:"center",justifyContent:"center",color:T.cyan}}><Zap size={18}/></div>
+          <div style={{flex:1}}><p style={{fontSize:14,fontWeight:600}}>Auto-categorização</p><p style={{fontSize:12,color:T.textDim}}>Detecta categoria pela descrição</p></div>
+          <div onClick={()=>setAutoCatEnabled(v=>!v)} style={{width:44,height:24,borderRadius:12,padding:2,cursor:"pointer",background:autoCatEnabled?T.cyan:T.surfaceAlt,transition:"background 0.2s",flexShrink:0}}><div style={{width:20,height:20,borderRadius:10,background:"#fff",transform:autoCatEnabled?"translateX(20px)":"translateX(0)",transition:"transform 0.2s"}}/></div>
+        </div>
+      </GlassCard>
       {[
         {icon:<Users size={18}/>,label:"Conta Compartilhada",desc:sharedKey?"Conectada":"Não configurada",color:T.accent,onClick:onShowShared},
         {icon:<Crown size={18}/>,label:"Valora Premium",desc:isPremium?"Ativo ✓":"R$ 14,90/mês",color:T.gold,onClick:onShowPremium},
@@ -1133,7 +1387,7 @@ function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{width:36,height:36,borderRadius:T.radiusXs,background:item.color+"15",display:"flex",alignItems:"center",justifyContent:"center",color:item.color}}>{item.icon}</div>
             <div style={{flex:1}}><p style={{fontSize:14,fontWeight:600}}>{item.label}</p><p style={{fontSize:12,color:T.textDim}}>{item.desc}</p></div>
-            {item.toggle?(<div onClick={e=>{e.stopPropagation();item.onToggle();}} style={{width:44,height:24,borderRadius:12,padding:2,cursor:"pointer",background:item.checked?T.income:T.surfaceAlt,transition:"background 0.2s"}}><div style={{width:20,height:20,borderRadius:10,background:"#fff",transform:item.checked?"translateX(20px)":"translateX(0)",transition:"transform 0.2s"}}/></div>):item.onClick?<ChevronRight size={16} color={T.textDim}/>:null}
+            {item.onClick?<ChevronRight size={16} color={T.textDim}/>:null}
           </div>
         </GlassCard>
       ))}
@@ -1145,77 +1399,324 @@ function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium
   );
 }
 
-// ── DATA GENERATORS ───────────────────────────────────────────────────────────
-function generateSampleBills() {
-  return [
-    {id:uid(),name:"Aluguel",      amount:1500,dueDay:5, category:"moradia",  active:true,paid:false},
-    {id:uid(),name:"Internet",     amount:120, dueDay:10,category:"moradia",  active:true,paid:false},
-    {id:uid(),name:"Netflix",      amount:45,  dueDay:15,category:"lazer",    active:true,paid:true},
-    {id:uid(),name:"Conta de Luz", amount:180, dueDay:20,category:"moradia",  active:true,paid:false},
-    {id:uid(),name:"Academia",     amount:99,  dueDay:8, category:"saude",    active:true,paid:false},
-  ];
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 2 — MOBILLS: RELATÓRIOS AVANÇADOS
+// ══════════════════════════════════════════════════════════════════════════════
+function RelatoriosScreen({ transactions, onClose }) {
+  const now = new Date();
+  const [selMonth, setSelMonth] = useState(now.getMonth());
+  const [selYear]  = useState(now.getFullYear());
+
+  const prevMonth = (selMonth - 1 + 12) % 12;
+  const prevYear  = selMonth === 0 ? selYear - 1 : selYear;
+
+  const monthTx = useMemo(() =>
+    transactions.filter(t => { const d = new Date(t.date); return d.getMonth()===selMonth && d.getFullYear()===selYear; }),
+    [transactions, selMonth, selYear]);
+
+  const prevTx = useMemo(() =>
+    transactions.filter(t => { const d = new Date(t.date); return d.getMonth()===prevMonth && d.getFullYear()===prevYear; }),
+    [transactions, prevMonth, prevYear]);
+
+  const totalInc  = monthTx.filter(t => t.type==="income").reduce((s,t)  => s+(t.valueInBRL??t.value), 0);
+  const totalExp  = monthTx.filter(t => t.type==="expense").reduce((s,t) => s+(t.valueInBRL??t.value), 0);
+  const prevExp   = prevTx.filter(t  => t.type==="expense").reduce((s,t) => s+(t.valueInBRL??t.value), 0);
+  const balance   = totalInc - totalExp;
+  const savRate   = totalInc > 0 ? ((totalInc - totalExp) / totalInc * 100) : 0;
+  const expDiff   = prevExp  > 0 ? ((totalExp - prevExp) / prevExp * 100) : 0;
+
+  const catData = useMemo(() => {
+    const map = {};
+    monthTx.filter(t => t.type==="expense").forEach(t => { map[t.category] = (map[t.category]||0) + (t.valueInBRL??t.value); });
+    return Object.entries(map).map(([k,v]) => ({ name: CATEGORIES[k]?.label||k, value: v, color: CATEGORIES[k]?.color||"#94A3B8", key: k }))
+      .sort((a,b) => b.value - a.value);
+  }, [monthTx]);
+
+  const yearData = useMemo(() => MONTHS.map((m,i) => {
+    const mt = transactions.filter(t => { const d = new Date(t.date); return d.getMonth()===i && d.getFullYear()===selYear; });
+    return { name: m, receitas: mt.filter(t=>t.type==="income").reduce((s,t)=>s+(t.valueInBRL??t.value),0), despesas: mt.filter(t=>t.type==="expense").reduce((s,t)=>s+(t.valueInBRL??t.value),0) };
+  }), [transactions, selYear]);
+
+  const exportCSV = () => {
+    const rows = [["Data","Tipo","Descrição","Categoria","Valor BRL","Moeda","Valor Original"]];
+    monthTx.forEach(t => rows.push([t.date, t.type==="income"?"Receita":"Despesa", t.description, CATEGORIES[t.category]?.label||t.category, (t.valueInBRL??t.value).toFixed(2), t.currency||"BRL", t.value.toFixed(2)]));
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿"+csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a"); a.href = url; a.download = `valora-${MONTHS[selMonth]}-${selYear}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const maxCat = catData[0]?.value || 1;
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:2000,background:T.bg,overflowY:"auto",fontFamily:T.font}}>
+      <style>{globalCSS}</style>
+      <div style={{maxWidth:430,margin:"0 auto",padding:"0 16px 80px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0 12px"}}>
+          <h1 style={{fontFamily:T.fontDisplay,fontSize:22,fontWeight:700}}>Relatórios</h1>
+          <div style={{display:"flex",gap:8}}>
+            <div onClick={exportCSV} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:T.radiusSm,background:T.accentSoft,color:T.accent,cursor:"pointer",fontSize:13,fontWeight:600,border:`1px solid ${T.accent}30`}}><Download size={14}/>CSV</div>
+            <div onClick={onClose} style={{width:36,height:36,borderRadius:"50%",background:T.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={18} color={T.textMuted}/></div>
+          </div>
+        </div>
+
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16,marginBottom:16}}>
+          <ChevronLeft size={20} color={T.textMuted} style={{cursor:"pointer"}} onClick={()=>setSelMonth(p=>(p-1+12)%12)}/>
+          <span style={{fontFamily:T.fontDisplay,fontSize:16,fontWeight:600,minWidth:120,textAlign:"center"}}>{MONTHS_FULL[selMonth]} {selYear}</span>
+          <ChevronRight size={20} color={T.textMuted} style={{cursor:"pointer"}} onClick={()=>setSelMonth(p=>(p+1)%12)}/>
+        </div>
+
+        {/* Summary Cards */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+          {[
+            {label:"Receitas",   value:fmt(totalInc), color:T.income,  bg:T.incomeSoft},
+            {label:"Despesas",   value:fmt(totalExp), color:T.expense, bg:T.expenseSoft},
+            {label:"Saldo",      value:fmt(balance),  color:balance>=0?T.income:T.expense, bg:balance>=0?T.incomeSoft:T.expenseSoft},
+            {label:"Poupança",   value:savRate.toFixed(0)+"%", color:T.accent, bg:T.accentSoft},
+          ].map((c,i)=>(
+            <div key={i} style={{background:c.bg,borderRadius:T.radiusSm,padding:"12px 14px"}}>
+              <p style={{fontSize:11,color:c.color,fontWeight:600,marginBottom:4}}>{c.label}</p>
+              <p style={{fontFamily:T.fontDisplay,fontSize:18,fontWeight:700,color:c.color}}>{c.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Comparação mês anterior */}
+        {prevExp > 0 && (
+          <GlassCard style={{marginBottom:14,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+            {expDiff > 0
+              ? <ArrowUpRight size={20} color={T.expense}/>
+              : <ArrowDownRight size={20} color={T.income}/>}
+            <div style={{flex:1}}>
+              <p style={{fontSize:13,color:T.text,fontWeight:500}}>
+                {expDiff > 0
+                  ? `${expDiff.toFixed(0)}% mais gastos que ${MONTHS_FULL[prevMonth]}`
+                  : `${Math.abs(expDiff).toFixed(0)}% menos gastos que ${MONTHS_FULL[prevMonth]}`}
+              </p>
+              <p style={{fontSize:11,color:T.textDim,marginTop:2}}>{MONTHS_FULL[prevMonth]}: {fmt(prevExp)} → {MONTHS_FULL[selMonth]}: {fmt(totalExp)}</p>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Categorias com barras */}
+        {catData.length > 0 && (
+          <GlassCard style={{marginBottom:14,padding:"16px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <div style={{width:100,height:100,flexShrink:0}}>
+                <ResponsiveContainer>
+                  <PieChart><Pie data={catData} dataKey="value" cx="50%" cy="50%" innerRadius={26} outerRadius={46} paddingAngle={3} strokeWidth={0}>
+                    {catData.map((c,i)=><Cell key={i} fill={c.color}/>)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{flex:1}}>
+                {catData.slice(0,5).map((c,i)=>(
+                  <div key={i} style={{marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                      <span style={{fontSize:12,color:T.textMuted}}>{c.name}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:T.text}}>{fmt(c.value)}</span>
+                    </div>
+                    <div style={{height:4,background:T.surfaceAlt,borderRadius:2,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${(c.value/maxCat*100).toFixed(0)}%`,background:c.color,borderRadius:2,transition:"width 0.6s ease"}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Evolução anual */}
+        <GlassCard style={{marginBottom:14,padding:"16px"}}>
+          <h3 style={{fontFamily:T.fontDisplay,fontSize:13,fontWeight:600,marginBottom:12,color:T.textMuted}}>Evolução Anual {selYear}</h3>
+          <div style={{height:180}}>
+            <ResponsiveContainer>
+              <AreaChart data={yearData}>
+                <defs>
+                  <linearGradient id="gInc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={T.income} stopOpacity={0.3}/><stop offset="95%" stopColor={T.income} stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gExp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={T.expense} stopOpacity={0.3}/><stop offset="95%" stopColor={T.expense} stopOpacity={0}/></linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+                <XAxis dataKey="name" tick={{fill:T.textDim,fontSize:9}} axisLine={false} tickLine={false}/>
+                <YAxis hide/>
+                <Tooltip contentStyle={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,fontSize:11}} formatter={v=>fmt(v)}/>
+                <Area type="monotone" dataKey="receitas" stroke={T.income} fill="url(#gInc)" strokeWidth={2}/>
+                <Area type="monotone" dataKey="despesas" stroke={T.expense} fill="url(#gExp)" strokeWidth={2}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+      </div>
+    </div>
+  );
 }
 
-function generateSampleGoals() {
-  return [
-    {id:uid(),name:"Reserva de emergência",target:10000,current:3200,deadline:"2026-12-31",icon:"🏦"},
-    {id:uid(),name:"Viagem nas férias",    target:4000, current:900, deadline:"2026-07-15",icon:"✈️"},
-  ];
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 4 — ORGANIZZE: MODO CASAL APRIMORADO
+// ══════════════════════════════════════════════════════════════════════════════
+function CoupleView({ transactions, sharedKey, userName }) {
+  const myTx      = transactions.filter(t => t.user === userName || t.user === "Você");
+  const partnerTx = transactions.filter(t => t.user !== userName && t.user !== "Você");
+  const myTotal   = myTx.filter(t=>t.type==="expense").reduce((s,t)=>s+(t.valueInBRL??t.value),0);
+  const partTotal = partnerTx.filter(t=>t.type==="expense").reduce((s,t)=>s+(t.valueInBRL??t.value),0);
+  const total     = myTotal + partTotal;
+
+  if (!sharedKey) return null;
+  return (
+    <GlassCard style={{marginBottom:12,padding:"14px 16px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+        <Users size={16} color={T.accent}/>
+        <span style={{fontSize:13,fontWeight:600,color:T.accent}}>Visão do Casal</span>
+        <span style={{marginLeft:"auto",fontSize:10,color:T.textDim,fontFamily:"monospace"}}>{sharedKey}</span>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:10}}>
+        {[{label:"Você",value:myTotal,color:T.income},{label:"Parceiro(a)",value:partTotal,color:T.accent}].map((p,i)=>(
+          <div key={i} style={{flex:1,background:T.surfaceAlt,borderRadius:T.radiusXs,padding:"10px 12px"}}>
+            <p style={{fontSize:11,color:p.color,fontWeight:600,marginBottom:3}}>{p.label}</p>
+            <p style={{fontFamily:T.fontDisplay,fontSize:15,fontWeight:700,color:p.color}}>{fmt(p.value)}</p>
+          </div>
+        ))}
+      </div>
+      {total > 0 && (
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+            <span style={{fontSize:11,color:T.textDim}}>Você {total > 0 ? (myTotal/total*100).toFixed(0) : 0}%</span>
+            <span style={{fontSize:11,color:T.textDim}}>Parceiro(a) {total > 0 ? (partTotal/total*100).toFixed(0) : 0}%</span>
+          </div>
+          <div style={{height:6,background:T.surfaceAlt,borderRadius:3,overflow:"hidden",display:"flex"}}>
+            <div style={{width:`${total>0?(myTotal/total*100):50}%`,background:T.income,transition:"width 0.6s ease"}}/>
+            <div style={{flex:1,background:T.accent}}/>
+          </div>
+          <p style={{fontSize:11,color:T.textDim,textAlign:"center",marginTop:6}}>Total conjunto: {fmt(total)}</p>
+        </div>
+      )}
+    </GlassCard>
+  );
 }
 
-function generateSimulatedUsers() {
-  const names=[
-    {name:"Lucas Pelicer",    email:"lgpelicer@gmail.com",    premium:true},
-    {name:"Maria Silva",      email:"maria.silva@email.com",  premium:true},
-    {name:"João Santos",      email:"joao.santos@email.com",  premium:false},
-    {name:"Ana Oliveira",     email:"ana.oliveira@email.com", premium:true},
-    {name:"Carlos Ferreira",  email:"carlos.f@email.com",     premium:false},
-    {name:"Beatriz Costa",    email:"bea.costa@email.com",    premium:false},
-    {name:"Pedro Almeida",    email:"pedro.alm@email.com",    premium:true},
-    {name:"Juliana Rodrigues",email:"ju.rodrigues@email.com", premium:false},
-    {name:"Rafael Lima",      email:"rafa.lima@email.com",    premium:true},
-    {name:"Camila Souza",     email:"cami.souza@email.com",   premium:false},
-  ];
-  const now=new Date();
-  return names.map(n=>({...n,id:uid(),
-    joinDate:new Date(now.getFullYear(),now.getMonth()-Math.floor(Math.random()*6),Math.floor(Math.random()*28)+1).toISOString().split("T")[0],
-    lastActive:new Date(now.getFullYear(),now.getMonth(),now.getDate()-Math.floor(Math.random()*10)).toISOString().split("T")[0],
-    transactions:Math.floor(Math.random()*120)+10,
-  }));
-}
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 5 — JOTA IA: ASSISTENTE FINANCEIRO INTELIGENTE
+// ══════════════════════════════════════════════════════════════════════════════
+const CHIPS = ["Qual meu saldo?","Onde gastei mais?","Dica de economia","Resumo do mês","Contas a vencer"];
 
-function generateSampleData() {
-  const data=[]; const now=new Date(); const m=now.getMonth(); const y=now.getFullYear();
-  const expenses=[
-    {cat:"alimentacao",desc:"Almoço restaurante",min:25,max:80},
-    {cat:"alimentacao",desc:"iFood delivery",    min:20,max:60},
-    {cat:"mercado",    desc:"Supermercado",       min:80,max:450},
-    {cat:"transporte", desc:"Uber",               min:12,max:45},
-    {cat:"transporte", desc:"Gasolina",           min:100,max:300},
-    {cat:"moradia",    desc:"Aluguel",            min:1500,max:1500},
-    {cat:"moradia",    desc:"Conta de luz",       min:80,max:250},
-    {cat:"moradia",    desc:"Internet",           min:120,max:120},
-    {cat:"saude",      desc:"Consulta médica",    min:150,max:350},
-    {cat:"farmacia",   desc:"Medicamentos",       min:30,max:120},
-    {cat:"lazer",      desc:"Netflix",            min:45,max:45},
-    {cat:"lazer",      desc:"Cinema",             min:30,max:80},
-    {cat:"educacao",   desc:"Curso online",       min:50,max:200},
-  ];
-  const incomes=[
-    {cat:"salario",    desc:"Salário",            min:5000,max:5000},
-    {cat:"freelance",  desc:"Projeto freelance",  min:500,max:2000},
-    {cat:"investimento",desc:"Rendimento",        min:50,max:300},
-  ];
-  for (let pm=0;pm<=5;pm++) {
-    const cm=(m-pm+12)%12; const cy=m-pm<0?y-1:y;
-    incomes.forEach(inc=>{
-      if (Math.random()>0.3) data.push({id:uid(),type:"income",value:inc.min+Math.floor(Math.random()*(inc.max-inc.min)),category:inc.cat,description:inc.desc,user:Math.random()>0.8?"Maria":"Você",date:`${cy}-${String(cm+1).padStart(2,"0")}-${String(Math.floor(Math.random()*20)+1).padStart(2,"0")}`,timestamp:Date.now()});
-    });
-    const count = pm===0?14:8+Math.floor(Math.random()*8);
-    for (let i=0;i<count;i++) {
-      const exp=expenses[Math.floor(Math.random()*expenses.length)];
-      data.push({id:uid(),type:"expense",value:exp.min+Math.floor(Math.random()*(exp.max-exp.min)),category:exp.cat,description:exp.desc,user:Math.random()>0.7?"Maria":"Você",date:`${cy}-${String(cm+1).padStart(2,"0")}-${String(Math.floor(Math.random()*28)+1).padStart(2,"0")}`,timestamp:Date.now()});
+function JotaOverlay({ open, onClose, listening, speaking, transcript, agentContext, onListen, onStop, supported }) {
+  const [history, setHistory] = useState([]);
+  const [input, setInput]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+  const inputRef  = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [history, loading]);
+  useEffect(() => { if (open) setTimeout(()=>inputRef.current?.focus(), 300); }, [open]);
+
+  useEffect(() => {
+    if (transcript && !listening) sendMessage(transcript);
+  }, [transcript, listening]); // eslint-disable-line
+
+  const sendMessage = async (text) => {
+    if (!text?.trim()) return;
+    setInput("");
+    const userMsg = { role:"user", text: text.trim() };
+    setHistory(h => [...h, userMsg]);
+    setLoading(true);
+    try {
+      const supabaseUrl = window.__VALORA_SUPABASE_URL__;
+      const supabaseKey = window.__VALORA_SUPABASE_KEY__;
+      let reply = "";
+      if (supabaseUrl && supabaseKey) {
+        const res = await fetch(`${supabaseUrl}/functions/v1/jota-ai`, {
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":`Bearer ${supabaseKey}`},
+          body: JSON.stringify({ message: text, context: agentContext, history }),
+        });
+        const data = await res.json();
+        reply = data.reply || data.message || "Nao entendi, pode reformular?";
+      } else {
+        reply = processValoraQuery(text, agentContext || {});
+      }
+      setHistory(h => [...h, { role:"assistant", text: reply }]);
+    } catch {
+      const fallback = processValoraQuery(text, agentContext || {});
+      setHistory(h => [...h, { role:"assistant", text: fallback }]);
+    } finally {
+      setLoading(false);
     }
-  }
-  return data.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  };
+
+  if (!open) return null;
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)"}}>
+      <div style={{flex:1,maxWidth:430,width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",height:"100%"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px 20px",background:T.surface,borderBottom:`1px solid ${T.border}`}}>
+          <div style={{width:40,height:40,borderRadius:"50%",background:`linear-gradient(135deg,${T.agent},#0891B2)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 14px ${T.agentGlow}`}}>
+            <span style={{fontSize:20}}>&#x1F916;</span>
+          </div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:14,fontWeight:700,color:T.agent}}>Jota &mdash; Valora IA</p>
+            <p style={{fontSize:11,color:T.textDim}}>{loading?"Pensando...":"Online"}</p>
+          </div>
+          <div onClick={()=>{onClose();window.speechSynthesis?.cancel();}} style={{width:32,height:32,borderRadius:"50%",background:T.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={16} color={T.textMuted}/></div>
+        </div>
+
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
+          {history.length === 0 && (
+            <div style={{textAlign:"center",padding:"32px 0"}}>
+              <p style={{fontSize:28,marginBottom:8}}>&#x1F916;</p>
+              <p style={{fontSize:14,color:T.text,fontWeight:600,marginBottom:4}}>Ola! Sou o Jota.</p>
+              <p style={{fontSize:13,color:T.textDim}}>Pergunte sobre seus gastos, saldo, metas ou peca dicas financeiras.</p>
+            </div>
+          )}
+          {history.map((m,i) => (
+            <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+              <div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",background:m.role==="user"?`linear-gradient(135deg,${T.accent},${T.agent})`:T.surfaceAlt,color:T.text,fontSize:14,lineHeight:1.5,fontFamily:T.font}}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{display:"flex",justifyContent:"flex-start"}}>
+              <div style={{padding:"10px 16px",borderRadius:"16px 16px 16px 4px",background:T.surfaceAlt,display:"flex",gap:6,alignItems:"center"}}>
+                {[0,1,2].map(i=><div key={i} style={{width:6,height:6,borderRadius:"50%",background:T.textDim,animation:`wave 1.2s ease-in-out ${i*0.2}s infinite`}}/>)}
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef}/>
+        </div>
+
+        {history.length === 0 && (
+          <div style={{display:"flex",gap:8,padding:"0 20px 12px",overflowX:"auto"}}>
+            {CHIPS.map((c,i)=>(
+              <div key={i} onClick={()=>sendMessage(c)} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontSize:12,color:T.textMuted,cursor:"pointer",fontFamily:T.font,whiteSpace:"nowrap"}}>
+                {c}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{padding:"12px 20px 24px",background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",gap:10,alignItems:"flex-end"}}>
+          <div style={{flex:1,background:T.surfaceAlt,borderRadius:22,border:`1px solid ${T.border}`,padding:"10px 16px",display:"flex",alignItems:"center"}}>
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&sendMessage(input)}
+              placeholder="Pergunte algo..."
+              style={{flex:1,background:"transparent",border:"none",outline:"none",color:T.text,fontFamily:T.font,fontSize:14}}
+            />
+          </div>
+          {supported && (
+            <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,animation:listening?"pulse 1.5s infinite":"none"}}>
+              {listening?<MicOff size={18} color="#fff"/>:<Mic size={18} color={T.textMuted}/>}
+            </div>
+          )}
+          <div onClick={()=>sendMessage(input)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${T.accent},${T.agent})`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,opacity:input.trim()?1:0.4}}>
+            <ArrowUpRight size={18} color="#fff"/>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
