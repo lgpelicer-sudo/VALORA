@@ -624,6 +624,27 @@ function AgentFAB({ onClick, speaking, listening }) {
 }
 
 // ── DATA GENERATORS ──────────────────────────────────────────────────────────
+function generateSimulatedUsers() {
+  const names=[
+    {name:"Lucas Pelicer",    email:"lgpelicer@gmail.com",    premium:true},
+    {name:"Maria Silva",      email:"maria.silva@email.com",  premium:true},
+    {name:"João Santos",      email:"joao.santos@email.com",  premium:false},
+    {name:"Ana Oliveira",     email:"ana.oliveira@email.com", premium:true},
+    {name:"Carlos Ferreira",  email:"carlos.f@email.com",     premium:false},
+    {name:"Beatriz Costa",    email:"bea.costa@email.com",    premium:false},
+    {name:"Pedro Almeida",    email:"pedro.alm@email.com",    premium:true},
+    {name:"Juliana Rodrigues",email:"ju.rodrigues@email.com", premium:false},
+    {name:"Rafael Lima",      email:"rafa.lima@email.com",    premium:true},
+    {name:"Camila Souza",     email:"cami.souza@email.com",   premium:false},
+  ];
+  const now=new Date();
+  return names.map(n=>({...n,id:uid(),
+    joinDate:new Date(now.getFullYear(),now.getMonth()-Math.floor(Math.random()*6),Math.floor(Math.random()*28)+1).toISOString().split("T")[0],
+    lastActive:new Date(now.getFullYear(),now.getMonth(),now.getDate()-Math.floor(Math.random()*10)).toISOString().split("T")[0],
+    transactions:Math.floor(Math.random()*120)+10,
+  }));
+}
+
 function generateSampleBills() {
   return [
     {id:uid(),name:"Aluguel",      amount:1500,dueDay:5, category:"moradia",  active:true,paid:false},
