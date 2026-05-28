@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { supabase, db, signIn, signUp, signOut } from "./supabase.js";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { Mic, Camera, Plus, X, ChevronRight, ChevronLeft, Users, FileText, Shield, Crown, Home, BarChart3, Settings, Bell, Search, Calendar, Download, Check, CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, Copy, UserPlus, ShieldCheck, Target, MicOff, Volume2, TrendingUp, Activity, UserCheck, Zap } from "lucide-react";
 
@@ -701,6 +702,12 @@ function generateSampleData() {
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function Valora() {
+  // ── Auth state ──────────────────────────────────────────────────────────────
+  const [authUser,setAuthUser]       = useState(null);   // supabase user object
+  const [authLoading,setAuthLoading] = useState(true);   // checking session
+  const [showAuth,setShowAuth]       = useState(false);  // show auth screen
+
+  // ── App state ───────────────────────────────────────────────────────────────
   const [tab,setTab] = useState("home");
   const [transactions,setTransactions] = useState(()=>loadData("valora_tx",generateSampleData()));
   const [bills,setBills] = useState(()=>loadData("valora_bills",generateSampleBills()));
@@ -710,7 +717,6 @@ export default function Valora() {
   const [userEmail,setUserEmail]     = useState(()=>loadData("valora_email",""));
   const [isPremium,setIsPremium]     = useState(()=>loadData("valora_premium",false));
   const [trialStartDate]             = useState(()=>{ const s=loadData("valora_trial_start",null); if(!s){saveData("valora_trial_start",today());return today();}return s; });
-  const [showOnboarding,setShowOnboarding] = useState(()=>!loadData("valora_onboarded",false));
   const [showAddSheet,setShowAddSheet]   = useState(false);
   const [addType,setAddType]             = useState("expense");
   const [showVoiceSheet,setShowVoiceSheet] = useState(false);
@@ -741,14 +747,114 @@ export default function Valora() {
   const trialDaysLeft = useMemo(()=>{ const diff=Math.floor((Date.now()-new Date(trialStartDate).getTime())/864e5); return Math.max(0,7-diff); },[trialStartDate]);
   const isBlocked = trialDaysLeft<=0 && !isPremium && !isAdmin;
 
-  useEffect(()=>{ saveData("valora_tx",transactions); if(sharedKey)saveData(`valora_shared_${sharedKey}_tx`,transactions); },[transactions,sharedKey]);
-  useEffect(()=>{ saveData("valora_bills",bills); if(sharedKey)saveData(`valora_shared_${sharedKey}_bills`,bills); },[bills,sharedKey]);
-  useEffect(()=>{ saveData("valora_goals",goals); if(sharedKey)saveData(`valora_shared_${sharedKey}_goals`,goals); },[goals,sharedKey]);
+  // ── Supabase: verificar sessão ao iniciar ──────────────────────────────────
+  useEffect(()=>{
+    supabase.auth.getSession().then(({ data: { session } })=>{
+      if (session?.user) {
+        setAuthUser(session.user);
+        loadFromSupabase(session.user);
+      } else {
+        setShowAuth(true);
+      }
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session)=>{
+      if (session?.user) { setAuthUser(session.user); setShowAuth(false); }
+      else { setAuthUser(null); setShowAuth(true); }
+    });
+    return ()=>subscription.unsubscribe();
+  },[]); // eslint-disable-line
+
+  // ── Carregar dados do Supabase ─────────────────────────────────────────────
+  const loadFromSupabase = async (user) => {
+    const uid = user.id;
+    const key = loadData("valora_key", null);
+    try {
+      const [txRes, billsRes, goalsRes, profileRes] = await Promise.all([
+        db.getTransactions(uid, key),
+        db.getBills(uid, key),
+        db.getGoals(uid, key),
+        db.getProfile(uid),
+      ]);
+      if (txRes.data?.length)    setTransactions(txRes.data.map(mapTx));
+      if (billsRes.data?.length) setBills(billsRes.data.map(mapBill));
+      if (goalsRes.data?.length) setGoals(goalsRes.data.map(mapGoal));
+      if (profileRes.data) {
+        const p = profileRes.data;
+        if (p.name)       setUserName(p.name);
+        if (p.shared_key) setSharedKey(p.shared_key);
+        if (p.is_premium) setIsPremium(true);
+        setAutoCatEnabled(p.auto_cat_enabled ?? true);
+        const email = user.email || "";
+        setUserEmail(email);
+        saveData("valora_email", email);
+      }
+    } catch(e) { console.warn("Supabase load error:", e); }
+  };
+
+  // Mappers: Supabase → app format
+  const mapTx   = r => ({ id:r.id, type:r.type, value:r.value, valueInBRL:r.value_in_brl??r.value, currency:r.currency||"BRL", category:r.category, description:r.description, date:r.date, user:userName||"Você", timestamp:new Date(r.created_at).getTime() });
+  const mapBill  = r => ({ id:r.id, name:r.name, amount:r.amount, dueDay:r.due_day, category:r.category||"outros", active:r.active, paid:r.paid });
+  const mapGoal  = r => ({ id:r.id, name:r.name, target:r.target, current:r.current_amount, deadline:r.deadline, icon:r.icon||"🎯" });
+
+  // ── Salvar no Supabase (quando autenticado) ────────────────────────────────
+  const syncTx = useCallback(async (tx)=>{
+    if (!authUser) return;
+    // Insert novas transações não salvas (identificadas por falta de created_at)
+    const newTx = tx.filter(t=>!t._synced);
+    for (const t of newTx) {
+      await db.addTransaction({ id:t.id, user_id:authUser.id, shared_key:sharedKey||null, type:t.type, value:t.value, value_in_brl:t.valueInBRL, currency:t.currency||"BRL", category:t.category, description:t.description, date:t.date });
+    }
+  },[authUser,sharedKey]);
+
+  // ── Persistência local (fallback offline) ─────────────────────────────────
+  useEffect(()=>{ saveData("valora_tx",transactions); },[transactions]);
+  useEffect(()=>{ saveData("valora_bills",bills); },[bills]);
+  useEffect(()=>{ saveData("valora_goals",goals); },[goals]);
   useEffect(()=>{ saveData("valora_key",sharedKey); },[sharedKey]);
   useEffect(()=>{ saveData("valora_user",userName); },[userName]);
   useEffect(()=>{ saveData("valora_email",userEmail); },[userEmail]);
   useEffect(()=>{ saveData("valora_premium",isPremium); },[isPremium]);
   useEffect(()=>{ saveData("valora_autocat",autoCatEnabled); },[autoCatEnabled]);
+
+  // ── Realtime: modo casal ───────────────────────────────────────────────────
+  useEffect(()=>{
+    if (!authUser||!sharedKey) return;
+    const channel = supabase.channel(`shared_${sharedKey}`)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'transactions',filter:`shared_key=eq.${sharedKey}`},(payload)=>{
+        setTransactions(prev=>{ if(prev.find(t=>t.id===payload.new.id)) return prev; return [mapTx(payload.new),...prev]; });
+      })
+      .on('postgres_changes',{event:'DELETE',schema:'public',table:'transactions',filter:`shared_key=eq.${sharedKey}`},(payload)=>{
+        setTransactions(prev=>prev.filter(t=>t.id!==payload.old.id));
+      })
+      .subscribe();
+    return ()=>supabase.removeChannel(channel);
+  },[authUser,sharedKey]); // eslint-disable-line
+
+  // ── Auth handlers ──────────────────────────────────────────────────────────
+  const handleAuth = (user, name) => {
+    setAuthUser(user); setShowAuth(false);
+    setUserName(name); setUserEmail(user.email||"");
+    saveData("valora_user",name); saveData("valora_email",user.email||"");
+    loadFromSupabase(user);
+  };
+
+  const handleSignOut = async () => {
+    await signOut(); setAuthUser(null); setShowAuth(true);
+    setUserName(""); setUserEmail("");
+  };
+
+  // ── Loading / Auth screen ──────────────────────────────────────────────────
+  if (authLoading) return (
+    <div style={{background:T.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:40,marginBottom:12}}>💚</div>
+        <p style={{color:T.textMuted,fontFamily:T.font,fontSize:14}}>Carregando...</p>
+      </div>
+    </div>
+  );
+
+  if (showAuth) return <AuthScreen onAuth={handleAuth}/>;
 
   const notify = (msg, type="success") => { setNotification({msg,type}); setTimeout(()=>setNotification(null),3000); };
 
@@ -780,7 +886,7 @@ export default function Valora() {
 
   // Briefing proativo ao abrir
   useEffect(()=>{
-    if (showOnboarding||briefingDone.current) return;
+    if (showAuth||briefingDone.current) return;
     briefingDone.current = true;
     requestNotifPermission();
     setTimeout(()=>{
@@ -792,7 +898,7 @@ export default function Valora() {
       const urgent=(bills||[]).filter(b=>{const d=b.dueDay>=todayNum?b.dueDay-todayNum:(30-todayNum+b.dueDay);return d<=2&&b.active&&!b.paid;});
       if (urgent.length>0) sendNotif("Valora 💰",`${urgent.length} conta(s) vencendo em breve: ${urgent.map(b=>b.name).join(", ")}`);
     },1400);
-  },[showOnboarding]); // eslint-disable-line
+  },[showAuth]); // eslint-disable-line
 
   const handleCreateShared = () => {
     const code=`VALORA-${uid().toUpperCase()}`;
@@ -814,14 +920,23 @@ export default function Valora() {
     notify(stx?"Conectado! Dados sincronizados 🎉":"Conectado! Aguardando dados do parceiro.");
   };
 
-  const addTransaction = (tx) => {
+  const addTransaction = async (tx) => {
+    const id = uid();
     const currency = tx.currency || "BRL";
     const valueInBRL = currency === "BRL" ? tx.value : convert(tx.value, currency, "BRL");
-    setTransactions(prev=>[{id:uid(),date:tx.date||today(),...tx,currency,valueInBRL,user:userName||"Você",timestamp:Date.now()},...prev]);
+    const newTx = {id,date:tx.date||today(),...tx,currency,valueInBRL,user:userName||"Você",timestamp:Date.now()};
+    setTransactions(prev=>[newTx,...prev]);
     const displayVal = currency === "BRL" ? fmt(tx.value) : `${fmtCurrency(tx.value, currency)} (${fmt(valueInBRL)})`;
     notify(tx.type==="income"?`+${displayVal} registrado!`:`${displayVal} registrado!`,tx.type==="income"?"success":"expense");
+    if (authUser) {
+      db.addTransaction({ id, user_id:authUser.id, shared_key:sharedKey||null, type:tx.type, value:tx.value, value_in_brl:valueInBRL, currency, category:tx.category, description:tx.description||"", date:newTx.date }).catch(console.warn);
+    }
   };
-  const deleteTransaction = (id) => { setTransactions(prev=>prev.filter(t=>t.id!==id)); notify("Transação removida","info"); };
+  const deleteTransaction = (id) => {
+    setTransactions(prev=>prev.filter(t=>t.id!==id));
+    if (authUser) db.deleteTransaction(id).catch(console.warn);
+    notify("Transação removida","info");
+  };
 
   const handleFormSubmit = () => {
     const val = parseFloat(formValue.replace(",","."));
@@ -848,12 +963,24 @@ export default function Valora() {
     else notify("Não entendi o valor. Tente novamente.","error");
   };
 
-  const handleOnboardingDone = (name, email) => {
-    setUserName(name); setUserEmail(email);
-    setShowOnboarding(false); saveData("valora_onboarded",true);
+  // handleCreateShared: agora salva no Supabase também
+  const handleCreateSharedSupabase = async () => {
+    const code=`VALORA-${uid().toUpperCase()}`;
+    if (authUser) await db.upsertProfile({ id: authUser.id, shared_key: code });
+    setSharedKey(code);
+    notify("Conta compartilhada criada! Compartilhe o código.");
   };
 
-  if (showOnboarding) return <OnboardingScreen onDone={handleOnboardingDone} />;
+  const handleJoinSharedSupabase = async (code) => {
+    if (!code.startsWith("VALORA-")) return;
+    if (authUser) {
+      await db.upsertProfile({ id: authUser.id, shared_key: code });
+      const txRes = await db.getTransactions(authUser.id, code);
+      if (txRes.data?.length) setTransactions(txRes.data.map(mapTx));
+    }
+    setSharedKey(code);
+    notify("Conectado ao modo casal! 🎉");
+  };
   if (isBlocked) return (
     <>
       <PaywallScreen trialDaysLeft={0} onSubscribe={()=>setShowCheckout(true)} />
@@ -882,7 +1009,7 @@ export default function Valora() {
         {tab==="home"         && <HomeScreen balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} catData={catData} monthlyChart={monthlyChart} transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} userName={userName} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onDelete={deleteTransaction} onOpenAgent={()=>{setAgentResponse("");setShowAgent(true);}} rates={rates} lastUpdated={lastUpdated} onShowRelatorios={()=>setShowRelatorios(true)} />}
         {tab==="transactions" && <TransactionsScreen transactions={monthTx} filterMonth={filterMonth} setFilterMonth={setFilterMonth} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={deleteTransaction} />}
         {tab==="planejar"     && <PlanejamentoScreen bills={bills} setBills={setBills} goals={goals} setGoals={setGoals} notify={notify} />}
-        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} autoCatEnabled={autoCatEnabled} setAutoCatEnabled={setAutoCatEnabled} />}
+        {tab==="settings"     && <SettingsScreen userName={userName} setUserName={n=>{setUserName(n);saveData("valora_user",n);}} userEmail={userEmail} sharedKey={sharedKey} isPremium={isPremium} isAdmin={isAdmin} onShowPremium={()=>setShowPremium(true)} onShowShared={()=>setShowShared(true)} onAdminTab={()=>setTab("admin")} autoCatEnabled={autoCatEnabled} setAutoCatEnabled={setAutoCatEnabled} onSignOut={handleSignOut} />}
         {tab==="admin" && isAdmin && <AdminPanel allUsers={allUsers} />}
       </div>
 
@@ -960,9 +1087,9 @@ export default function Valora() {
           ):(
             <>
               <p style={{color:T.textMuted,fontSize:14,marginBottom:16}}>Gerencie finanças com sua família.</p>
-              <Btn variant="accent" onClick={handleCreateShared} icon={<UserPlus size={16}/>}>Criar Conta Compartilhada</Btn>
+              <Btn variant="accent" onClick={handleCreateSharedSupabase} icon={<UserPlus size={16}/>}>Criar Conta Compartilhada</Btn>
               <div style={{margin:"16px 0",color:T.textDim,fontSize:13}}>ou</div>
-              <Input placeholder="Cole a chave aqui (VALORA-...)" value="" onChange={v=>{if(v.length>8)handleJoinShared(v);}} />
+              <Input placeholder="Cole a chave aqui (VALORA-...)" value="" onChange={v=>{if(v.length>8)handleJoinSharedSupabase(v);}} />
             </>
           )}
         </div>
@@ -1239,36 +1366,95 @@ function PaywallScreen({ onSubscribe }) {
   );
 }
 
-// ── ONBOARDING ────────────────────────────────────────────────────────────────
-function OnboardingScreen({ onDone }) {
-  const [step,setStep]=useState(0); const [name,setName]=useState(""); const [email,setEmail]=useState("");
-  const steps=[
+// ── AUTH SCREEN (Supabase) ─────────────────────────────────────────────────────
+function AuthScreen({ onAuth }) {
+  const [mode,setMode]       = useState("welcome"); // welcome | login | signup
+  const [step,setStep]       = useState(0);
+  const [name,setName]       = useState("");
+  const [email,setEmail]     = useState("");
+  const [password,setPass]   = useState("");
+  const [loading,setLoading] = useState(false);
+  const [error,setError]     = useState("");
+
+  const slides=[
     {emoji:"💚",title:"Bem-vindo ao Valora",desc:"O app que ajuda você a valorizar, controlar e organizar seu dinheiro."},
-    {emoji:"🤖",title:"Seu Assistente de Voz",desc:"Pergunte à Valora IA: \"quanto gastei esse mês?\" e ela responde por voz, como uma Alexa financeira."},
+    {emoji:"🤖",title:"Seu Assistente de Voz",desc:"Pergunte à Valora IA: \"quanto gastei esse mês?\" e ela responde por voz."},
     {emoji:"🎯",title:"Metas e Contas",desc:"Cadastre contas fixas e metas. Nunca mais esqueça um vencimento."},
   ];
-  return (
+
+  const handleSignUp = async () => {
+    if (!name.trim()||!email.trim()||!password.trim()) return setError("Preencha todos os campos.");
+    if (password.length<6) return setError("Senha mínima: 6 caracteres.");
+    setLoading(true); setError("");
+    const { data, error: e } = await signUp(email.trim(), password, name.trim());
+    setLoading(false);
+    if (e) return setError(e.message);
+    if (data?.user) onAuth(data.user, name.trim());
+  };
+
+  const handleSignIn = async () => {
+    if (!email.trim()||!password.trim()) return setError("Preencha e-mail e senha.");
+    setLoading(true); setError("");
+    const { data, error: e } = await signIn(email.trim(), password);
+    setLoading(false);
+    if (e) return setError("E-mail ou senha incorretos.");
+    if (data?.user) onAuth(data.user, data.user.user_metadata?.name || email.split("@")[0]);
+  };
+
+  if (mode==="welcome") return (
     <div style={{fontFamily:T.font,background:T.bg,color:T.text,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 24px",maxWidth:430,margin:"0 auto"}}>
       <style>{globalCSS}</style>
       {step<3?(
         <div style={{textAlign:"center",animation:"fadeUp 0.5s ease"}}>
-          <div style={{fontSize:64,marginBottom:24}}>{steps[step].emoji}</div>
-          <h1 style={{fontFamily:T.fontDisplay,fontSize:28,fontWeight:800,marginBottom:12,lineHeight:1.2}}>{steps[step].title}</h1>
-          <p style={{color:T.textMuted,fontSize:15,lineHeight:1.6,marginBottom:40,maxWidth:300,margin:"0 auto 40px"}}>{steps[step].desc}</p>
+          <div style={{fontSize:64,marginBottom:24}}>{slides[step].emoji}</div>
+          <h1 style={{fontFamily:T.fontDisplay,fontSize:28,fontWeight:800,marginBottom:12,lineHeight:1.2}}>{slides[step].title}</h1>
+          <p style={{color:T.textMuted,fontSize:15,lineHeight:1.6,marginBottom:40,maxWidth:300,margin:"0 auto 40px"}}>{slides[step].desc}</p>
           <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:32}}>{[0,1,2].map(i=>(<div key={i} style={{width:step===i?24:8,height:8,borderRadius:4,background:step===i?T.income:T.surfaceAlt,transition:"all 0.3s"}}/>))}</div>
-          <Btn variant="primary" onClick={()=>setStep(step+1)} style={{maxWidth:280,margin:"0 auto"}}>{step===2?"Criar conta":"Próximo"}</Btn>
+          <Btn variant="primary" onClick={()=>setStep(s=>s+1)} style={{maxWidth:280,margin:"0 auto"}}>{step===2?"Começar":"Próximo"}</Btn>
         </div>
       ):(
         <div style={{textAlign:"center",animation:"fadeUp 0.5s ease",width:"100%",maxWidth:320}}>
-          <div style={{fontSize:48,marginBottom:16}}>👤</div>
-          <h2 style={{fontFamily:T.fontDisplay,fontSize:24,fontWeight:700,marginBottom:8}}>Criar sua conta</h2>
-          <p style={{color:T.textMuted,fontSize:14,marginBottom:24}}>Seus dados ficam salvos localmente no dispositivo.</p>
-          <Input placeholder="Seu nome" value={name} onChange={setName} />
-          <Input placeholder="Seu e-mail" value={email} onChange={setEmail} type="email" />
-          {email.toLowerCase()===ADMIN_EMAIL&&(<div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",background:T.adminSoft,borderRadius:T.radiusXs,marginBottom:12,border:`1px solid ${T.admin}30`}}><ShieldCheck size={14} color={T.admin}/><span style={{fontSize:12,color:T.admin,fontWeight:600}}>Conta administrador detectada</span></div>)}
-          <Btn variant="primary" onClick={()=>onDone(name||"Usuário",email)} style={{marginTop:8}}>Entrar no Valora</Btn>
+          <div style={{fontSize:48,marginBottom:16}}>💚</div>
+          <h2 style={{fontFamily:T.fontDisplay,fontSize:26,fontWeight:800,marginBottom:8}}>Valora</h2>
+          <p style={{color:T.textMuted,fontSize:14,marginBottom:32}}>Seu controle financeiro inteligente</p>
+          <Btn variant="primary" onClick={()=>setMode("signup")} style={{marginBottom:12}}>Criar conta grátis</Btn>
+          <Btn variant="ghost" onClick={()=>setMode("login")}>Já tenho conta — Entrar</Btn>
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <div style={{fontFamily:T.font,background:T.bg,color:T.text,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",maxWidth:430,margin:"0 auto"}}>
+      <style>{globalCSS}</style>
+      <div style={{width:"100%",maxWidth:340,animation:"fadeUp 0.4s ease"}}>
+        <button onClick={()=>{setMode("welcome");setStep(3);setError("");}} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontSize:13,marginBottom:24,padding:0}}>← Voltar</button>
+        <div style={{fontSize:40,marginBottom:12,textAlign:"center"}}>{mode==="signup"?"👤":"🔑"}</div>
+        <h2 style={{fontFamily:T.fontDisplay,fontSize:24,fontWeight:700,marginBottom:4,textAlign:"center"}}>{mode==="signup"?"Criar conta":"Entrar"}</h2>
+        <p style={{color:T.textMuted,fontSize:13,marginBottom:28,textAlign:"center"}}>{mode==="signup"?"Dados salvos na nuvem com segurança":"Bem-vindo de volta!"}</p>
+
+        {mode==="signup"&&<Input placeholder="Seu nome" value={name} onChange={setName}/>}
+        <Input placeholder="E-mail" value={email} onChange={setEmail} type="email"/>
+        <Input placeholder="Senha (mín. 6 caracteres)" value={password} onChange={setPass} type="password"/>
+
+        {email.toLowerCase()===ADMIN_EMAIL&&(
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",background:T.adminSoft,borderRadius:T.radiusXs,marginBottom:12,border:`1px solid ${T.admin}30`}}>
+            <ShieldCheck size={14} color={T.admin}/>
+            <span style={{fontSize:12,color:T.admin,fontWeight:600}}>Conta administrador</span>
+          </div>
+        )}
+        {error&&<p style={{color:T.expense,fontSize:13,marginBottom:12,textAlign:"center"}}>{error}</p>}
+
+        <Btn variant="primary" onClick={mode==="signup"?handleSignUp:handleSignIn} disabled={loading} style={{marginTop:4}}>
+          {loading?"Aguarde...":(mode==="signup"?"Criar conta":"Entrar")}
+        </Btn>
+        <p style={{textAlign:"center",marginTop:16,fontSize:13,color:T.textMuted}}>
+          {mode==="signup"?"Já tem conta? ":"Não tem conta? "}
+          <span onClick={()=>{setMode(mode==="signup"?"login":"signup");setError("");}} style={{color:T.cyan,cursor:"pointer",fontWeight:600}}>
+            {mode==="signup"?"Entrar":"Criar conta"}
+          </span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -1373,7 +1559,7 @@ function TransactionsScreen({ transactions, filterMonth, setFilterMonth, searchQ
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
-function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab, autoCatEnabled, setAutoCatEnabled }) {
+function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium, isAdmin, onShowPremium, onShowShared, onAdminTab, autoCatEnabled, setAutoCatEnabled, onSignOut }) {
   const [editName,setEditName]=useState(false); const [tempName,setTempName]=useState(userName);
   return (
     <div style={{padding:"0 16px 20px"}}>
@@ -1412,6 +1598,14 @@ function SettingsScreen({ userName, setUserName, userEmail, sharedKey, isPremium
           </div>
         </GlassCard>
       ))}
+      {onSignOut&&(
+        <GlassCard onClick={onSignOut} style={{marginBottom:8,padding:"14px 16px",cursor:"pointer",border:`1px solid ${T.expense}20`}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:36,height:36,borderRadius:T.radiusXs,background:T.expenseSoft,display:"flex",alignItems:"center",justifyContent:"center",color:T.expense}}><X size={18}/></div>
+            <div style={{flex:1}}><p style={{fontSize:14,fontWeight:600,color:T.expense}}>Sair da conta</p><p style={{fontSize:12,color:T.textDim}}>Deslogar do Valora</p></div>
+          </div>
+        </GlassCard>
+      )}
       <div style={{textAlign:"center",padding:"24px 0",color:T.textDim}}>
         <p style={{fontSize:12,fontFamily:T.fontDisplay,fontWeight:500}}>Valora v2.0 • Powered by AI 🤖</p>
         <p style={{fontSize:11,marginTop:4}}>Feito com 💚 para suas finanças</p>
@@ -1631,43 +1825,24 @@ function JotaOverlay({ open, onClose, listening, speaking, transcript, agentCont
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [history, loading]);
   useEffect(() => { if (open) setTimeout(()=>inputRef.current?.focus(), 300); }, [open]);
-
-  useEffect(() => {
-    if (transcript && !listening) sendMessage(transcript);
-  }, [transcript, listening]); // eslint-disable-line
+  useEffect(() => { if (transcript && !listening) sendMessage(transcript); }, [transcript, listening]); // eslint-disable-line
 
   const sendMessage = async (text) => {
     if (!text?.trim()) return;
     setInput("");
-    const userMsg = { role:"user", text: text.trim() };
-    setHistory(h => [...h, userMsg]);
+    setHistory(h => [...h, { role:"user", text: text.trim() }]);
     setLoading(true);
     try {
-      const supabaseUrl = window.__VALORA_SUPABASE_URL__;
-      const supabaseKey = window.__VALORA_SUPABASE_KEY__;
-      let reply = "";
-      if (supabaseUrl && supabaseKey) {
-        const res = await fetch(`${supabaseUrl}/functions/v1/jota-ai`, {
-          method:"POST",
-          headers:{"Content-Type":"application/json","Authorization":`Bearer ${supabaseKey}`},
-          body: JSON.stringify({ message: text, context: agentContext, history }),
-        });
-        const data = await res.json();
-        reply = data.reply || data.message || "Nao entendi, pode reformular?";
-      } else {
-        reply = processValoraQuery(text, agentContext || {});
-      }
+      const reply = processValoraQuery(text, agentContext || {});
       setHistory(h => [...h, { role:"assistant", text: reply }]);
     } catch {
-      const fallback = processValoraQuery(text, agentContext || {});
-      setHistory(h => [...h, { role:"assistant", text: fallback }]);
+      setHistory(h => [...h, { role:"assistant", text: "Desculpe, ocorreu um erro. Tente novamente." }]);
     } finally {
       setLoading(false);
     }
   };
 
   if (!open) return null;
-
   return (
     <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)"}}>
       <div style={{flex:1,maxWidth:430,width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",height:"100%"}}>
@@ -1676,18 +1851,17 @@ function JotaOverlay({ open, onClose, listening, speaking, transcript, agentCont
             <span style={{fontSize:20}}>&#x1F916;</span>
           </div>
           <div style={{flex:1}}>
-            <p style={{fontSize:14,fontWeight:700,color:T.agent}}>Jota &mdash; Valora IA</p>
+            <p style={{fontSize:14,fontWeight:700,color:T.agent}}>Jota &#8212; Valora IA</p>
             <p style={{fontSize:11,color:T.textDim}}>{loading?"Pensando...":"Online"}</p>
           </div>
           <div onClick={()=>{onClose();window.speechSynthesis?.cancel();}} style={{width:32,height:32,borderRadius:"50%",background:T.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={16} color={T.textMuted}/></div>
         </div>
-
         <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
           {history.length === 0 && (
             <div style={{textAlign:"center",padding:"32px 0"}}>
               <p style={{fontSize:28,marginBottom:8}}>&#x1F916;</p>
               <p style={{fontSize:14,color:T.text,fontWeight:600,marginBottom:4}}>Ola! Sou o Jota.</p>
-              <p style={{fontSize:13,color:T.textDim}}>Pergunte sobre seus gastos, saldo, metas ou peca dicas financeiras.</p>
+              <p style={{fontSize:13,color:T.textDim}}>Pergunte sobre seus gastos, saldo, metas ou peça dicas financeiras.</p>
             </div>
           )}
           {history.map((m,i) => (
@@ -1706,30 +1880,19 @@ function JotaOverlay({ open, onClose, listening, speaking, transcript, agentCont
           )}
           <div ref={bottomRef}/>
         </div>
-
         {history.length === 0 && (
           <div style={{display:"flex",gap:8,padding:"0 20px 12px",overflowX:"auto"}}>
             {CHIPS.map((c,i)=>(
-              <div key={i} onClick={()=>sendMessage(c)} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontSize:12,color:T.textMuted,cursor:"pointer",fontFamily:T.font,whiteSpace:"nowrap"}}>
-                {c}
-              </div>
+              <div key={i} onClick={()=>sendMessage(c)} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontSize:12,color:T.textMuted,cursor:"pointer",fontFamily:T.font,whiteSpace:"nowrap"}}>{c}</div>
             ))}
           </div>
         )}
-
         <div style={{padding:"12px 20px 24px",background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",gap:10,alignItems:"flex-end"}}>
           <div style={{flex:1,background:T.surfaceAlt,borderRadius:22,border:`1px solid ${T.border}`,padding:"10px 16px",display:"flex",alignItems:"center"}}>
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={e=>setInput(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&sendMessage(input)}
-              placeholder="Pergunte algo..."
-              style={{flex:1,background:"transparent",border:"none",outline:"none",color:T.text,fontFamily:T.font,fontSize:14}}
-            />
+            <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage(input)} placeholder="Pergunte algo..." style={{flex:1,background:"transparent",border:"none",outline:"none",color:T.text,fontFamily:T.font,fontSize:14}}/>
           </div>
           {supported && (
-            <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,animation:listening?"pulse 1.5s infinite":"none"}}>
+            <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
               {listening?<MicOff size={18} color="#fff"/>:<Mic size={18} color={T.textMuted}/>}
             </div>
           )}

@@ -1,0 +1,16 @@
+@echo off
+cd /d "C:\Users\Luiz\Downloads\valora\projeto_valora"
+echo Removing lock files...
+del /f /q ".git\index.lock" 2>nul
+del /f /q ".git\HEAD.lock" 2>nul
+echo Adding all files...
+git add -A
+echo Committing...
+git commit -m "feat: Supabase auth + cloud sync + realtime couple mode"
+echo Switching to main branch...
+git checkout -B main
+echo Pushing to origin main...
+git push origin main --force
+echo.
+echo === DONE ===
+pause
