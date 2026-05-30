@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase, db, signIn, signUp, signOut } from "./supabase.js";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { Mic, Camera, Plus, X, ChevronRight, ChevronLeft, Users, FileText, Shield, Crown, Home, BarChart3, Settings, Bell, Search, Calendar, Download, Check, CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, Copy, UserPlus, ShieldCheck, Target, MicOff, Volume2, TrendingUp, Activity, UserCheck, Zap } from "lucide-react";
@@ -1307,7 +1307,7 @@ function AdminPanel({ allUsers: _unused }) {
   const [adminTab,setAdminTab]=useState("overview");
   const [users,setUsers]=useState([]);
   const [loadingUsers,setLoadingUsers]=useState(true);
-  React.useEffect(()=>{
+  useEffect(()=>{
     supabase.from("profiles").select("*").then(({data,error})=>{
       if(!error&&data) setUsers(data);
       setLoadingUsers(false);
@@ -1496,7 +1496,7 @@ function AuthScreen({ onAuth }) {
 
 // ── Notifications BottomSheet ─────────────────────────────────────────────────
 function NotifSheet({ open, onClose, bills }) {
-  const [pushEnabled, setPushEnabled] = React.useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
   const overdue = (bills||[]).filter(b=>b.active&&!b.paid);
   return (
     <BottomSheet open={open} onClose={onClose} title="Notificações">
@@ -1525,9 +1525,9 @@ function NotifSheet({ open, onClose, bills }) {
 
 // ── Security BottomSheet ──────────────────────────────────────────────────────
 function SecuritySheet({ open, onClose, userEmail }) {
-  const [newPass, setNewPass] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [msg, setMsg] = React.useState("");
+  const [newPass, setNewPass] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
 
   const handleChangePass = async () => {
     if (!newPass || newPass.length < 6) { setMsg("Senha deve ter ao menos 6 caracteres."); return; }
@@ -1558,7 +1558,7 @@ function SecuritySheet({ open, onClose, userEmail }) {
 
 // ── Shared join input helper (local state avoids stale closure) ───────────────
 function JoinSharedInput({ onJoin }) {
-  const [code, setCode] = React.useState("");
+  const [code, setCode] = useState("");
   return (
     <div style={{display:"flex",gap:8,flexDirection:"column"}}>
       <Input placeholder="Cole a chave aqui (VALORA-...)" value={code} onChange={v=>setCode(v)} />
