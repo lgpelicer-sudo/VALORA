@@ -2009,7 +2009,7 @@ function JotaOverlay({ open, onClose, listening, speaking, transcript, agentCont
           {supported && (
             <div onClick={listening?onStop:onListen} style={{width:44,height:44,borderRadius:"50%",background:listening?T.expense:T.surfaceAlt,border:`1px solid ${listening?T.expense:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{listening?<MicOff size={20} color={T.expense}/>:<Mic size={20} color={T.textMuted}/>}</div>
           )}
-          <div onClick={()=>sendMessage(input)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${T.agent},#0891B2)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><Send size={18} color="#000"/></div>
+          <div onClick={()=>sendMessage(input)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${T.agent},#0891B2)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><ArrowUpRight size={18} color="#fff"/></div>
         </div>
       </div>
     </div>
