@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Italiano no Ouvido</title>
+<meta name="description" content="Curso de italiano hands-free para estudar caminhando ou trabalhando." />
+<script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE"></script>
+<style>
+:root{
+  --verde:#1a6b4a;
+  --verde-escuro:#0f3f2c;
+  --dourado:#c9a84c;
+  --branco:#ffffff;
+  --cinza:#f4f5f7;
+  --cinza-texto:#6b7280;
+  --vermelho:#e05a4e;
+  --sombra:0 10px 30px rgba(0,0,0,.15);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--cinza);
+  color:#222;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;}
+.hidden{display:none !important;}
+
+/* ============ TELA 1 - INÍCIO ============ */
+#tela-inicio{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:32px 24px;
+  text-align:center;
+  background:linear-gradient(180deg,#ffffff 0%,#f4f5f7 100%);
+}
+.bandeira{
+  display:flex;
+  width:96px;
+  height:64px;
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:var(--sombra);
+  margin-bottom:24px;
+}
+.bandeira div{flex:1;}
+.faixa-verde{background:#009246;}
+.faixa-branca{background:#ffffff;}
+.faixa-vermelha{background:#ce2b37;}
+
+.titulo-app{
+  font-size:32px;
+  font-weight:800;
+  margin:0 0 8px;
+  color:#1a1a1a;
+}
+.subtitulo-app{
+  color:var(--cinza-texto);
+  margin:0 0 24px;
+  font-size:15px;
+  max-width:320px;
+}
+.pills{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  margin-bottom:36px;
+}
+.pill{
+  background:var(--branco);
+  border:1px solid #e8e8e8;
+  border-radius:999px;
+  padding:8px 16px;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+.btn-principal{
+  background:var(--verde);
+  color:#fff;
+  font-weight:700;
+  font-size:17px;
+  padding:16px 40px;
+  border-radius:14px;
+  box-shadow:0 8px 20px rgba(26,107,74,.35);
+  transition:transform .15s ease;
+}
+.btn-principal:active{transform:scale(.96);}
+
+/* ============ MODAL ============ */
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;
+  padding:20px;
+}
+.modal{
+  background:#fff;
+  border-radius:20px;
+  padding:28px 24px;
+  max-width:380px;
+  width:100%;
+  box-shadow:var(--sombra);
+}
+.modal h2{margin:0 0 6px;font-size:20px;}
+.modal p.sub{margin:0 0 20px;color:var(--cinza-texto);font-size:13px;}
+.voz-opcao{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  border:2px solid #eee;
+  border-radius:14px;
+  padding:14px 16px;
+  margin-bottom:12px;
+  transition:.15s;
+}
+.voz-opcao.selecionada{
+  border-color:var(--verde);
+  background:#eef9f3;
+}
+.voz-opcao .emoji{font-size:26px;}
+.voz-opcao .info b{display:block;font-size:14px;}
+.voz-opcao .info span{font-size:12px;color:var(--cinza-texto);}
+.btn-confirmar{
+  width:100%;
+  background:var(--verde);
+  color:#fff;
+  font-weight:700;
+  padding:14px;
+  border-radius:12px;
+  font-size:15px;
+  margin-top:8px;
+}
+
+/* ============ TELA 2 - APP ============ */
+#tela-app{
+  min-height:100vh;
+  padding-bottom:74px;
+}
+.header-fixo{
+  position:sticky;top:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 20px;
+  background:#fff;
+  z-index:50;
+  border-bottom:1px solid #eee;
+}
+.header-fixo .logo{
+  font-weight:800;
+  font-size:16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.xp-contador{
+  background:var(--dourado);
+  color:#fff;
+  font-weight:700;
+  font-size:13px;
+  padding:6px 14px;
+  border-radius:999px;
+}
+
+.aba-conteudo{display:none;}
+.aba-conteudo.ativa{display:block;}
+
+/* PLAYER */
+.player{
+  background:var(--verde-escuro);
+  background:linear-gradient(160deg,#1a6b4a,#0f3f2c);
+  color:#fff;
+  padding:20px 20px 56px;
+  position:relative;
+}
+.player-badge{
+  display:inline-block;
+  background:rgba(255,255,255,.15);
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:10px;
+}
+.player-desc{
+  font-size:13px;
+  opacity:.85;
+  margin-bottom:18px;
+}
+.onda-box{
+  height:70px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  margin-bottom:18px;
+}
+.barra{
+  width:5px;
+  height:14px;
+  background:var(--dourado);
+  border-radius:3px;
+  opacity:.5;
+}
+.onda-box.tocando .barra{
+  animation:onda 0.9s ease-in-out infinite;
+}
+.onda-box.tocando .barra:nth-child(1){animation-delay:0s;}
+.onda-box.tocando .barra:nth-child(2){animation-delay:.1s;}
+.onda-box.tocando .barra:nth-child(3){animation-delay:.2s;}
+.onda-box.tocando .barra:nth-child(4){animation-delay:.3s;}
+.onda-box.tocando .barra:nth-child(5){animation-delay:.4s;}
+.onda-box.tocando .barra:nth-child(6){animation-delay:.3s;}
+.onda-box.tocando .barra:nth-child(7){animation-delay:.2s;}
+.onda-box.tocando .barra:nth-child(8){animation-delay:.1s;}
+.onda-box.tocando .barra:nth-child(9){animation-delay:0s;}
+@keyframes onda{
+  0%,100%{height:14px;opacity:.5;}
+  50%{height:54px;opacity:1;}
+}
+.frase-box{
+  text-align:center;
+  min-height:80px;
+  margin-bottom:20px;
+}
+.frase-it{
+  font-size:22px;
+  font-weight:800;
+  color:var(--dourado);
+  margin-bottom:8px;
+}
+.frase-pt{
+  font-size:16px;
+  color:#fff;
+  opacity:.9;
+}
+.controles{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:24px;
+}
+.controles button{
+  color:#fff;
+  font-size:20px;
+  width:46px;height:46px;
+  border-radius:50%;
+  background:rgba(255,255,255,.12);
+  display:flex;align-items:center;justify-content:center;
+}
+.controles .btn-play{
+  width:64px;height:64px;
+  font-size:26px;
+  background:var(--dourado);
+  color:#1a1a1a;
+}
+.controles button:active{transform:scale(.92);}
+
+/* CARD PRINCIPAL */
+.card-principal{
+  background:#fff;
+  border-radius:24px 24px 0 0;
+  margin-top:-40px;
+  position:relative;
+  padding:24px 20px 30px;
+  z-index:5;
+}
+.progresso-licao{
+  margin-bottom:18px;
+}
+.progresso-licao .label{
+  display:flex;justify-content:space-between;
+  font-size:13px;
+  font-weight:600;
+  color:var(--cinza-texto);
+  margin-bottom:6px;
+}
+.barra-progresso{
+  height:8px;
+  background:#eee;
+  border-radius:999px;
+  overflow:hidden;
+}
+.barra-progresso-fill{
+  height:100%;
+  background:var(--verde);
+  border-radius:999px;
+  transition:width .3s ease;
+}
+
+.lista-exercicios{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:16px;
+}
+.exercicio-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:12px;
+  background:var(--cinza);
+  border:2px solid transparent;
+}
+.exercicio-item.ativo{
+  border-color:var(--verde);
+  background:#eef9f3;
+}
+.exercicio-item.concluido .check{
+  background:var(--verde);
+  color:#fff;
+}
+.exercicio-item .check{
+  width:26px;height:26px;
+  border-radius:50%;
+  background:#ddd;
+  color:#fff;
+  font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.exercicio-item .tipo-tag{
+  font-size:11px;
+  text-transform:uppercase;
+  font-weight:700;
+  color:var(--cinza-texto);
+}
+.exercicio-item .txt{
+  font-size:14px;
+  font-weight:600;
+  flex:1;
+}
+
+.quiz-painel{
+  background:var(--cinza);
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:16px;
+}
+.quiz-painel .pergunta{
+  font-weight:700;
+  margin-bottom:12px;
+  font-size:15px;
+}
+.quiz-opcoes{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.quiz-opcao{
+  background:#fff;
+  border:2px solid #e2e2e2;
+  border-radius:10px;
+  padding:12px 14px;
+  text-align:left;
+  font-size:14px;
+  font-weight:600;
+}
+.quiz-opcao.correta{
+  border-color:var(--verde);
+  background:#eef9f3;
+  color:var(--verde);
+}
+.quiz-opcao.errada{
+  border-color:var(--vermelho);
+  background:#fdecea;
+  color:var(--vermelho);
+}
+
+.dica-box{
+  background:#fff8e6;
+  border-left:4px solid var(--dourado);
+  border-radius:10px;
+  padding:12px 14px;
+  font-size:13px;
+  margin-bottom:20px;
+  color:#6b5a20;
+}
+
+.titulo-secao{
+  font-size:16px;
+  font-weight:800;
+  margin:24px 0 14px;
+}
+.grid-licoes{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.licao-card{
+  background:var(--cinza);
+  border-radius:16px;
+  padding:16px;
+  position:relative;
+  cursor:pointer;
+}
+.licao-card.bloqueada{opacity:.5;}
+.licao-card .emoji-licao{font-size:28px;margin-bottom:8px;}
+.licao-card .nome-licao{font-weight:700;font-size:14px;margin-bottom:4px;}
+.licao-card .nivel-licao{font-size:11px;color:var(--cinza-texto);}
+.licao-card .cadeado{position:absolute;top:12px;right:12px;font-size:16px;}
+.licao-card.atual{outline:2px solid var(--verde);}
+
+/* VOCABULÁRIO */
+.aba-vocab{padding:20px;}
+.busca-vocab{
+  width:100%;
+  padding:14px 16px;
+  border-radius:14px;
+  border:1px solid #ddd;
+  font-size:15px;
+  margin-bottom:18px;
+  background:#fff;
+}
+.vocab-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:#fff;
+  border-radius:14px;
+  padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+.vocab-item .texto b{display:block;color:var(--verde);font-size:15px;}
+.vocab-item .texto span{font-size:13px;color:var(--cinza-texto);}
+.vocab-item .icone-falar{
+  font-size:20px;
+  background:var(--cinza);
+  width:40px;height:40px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+
+/* MODO */
+.aba-modo{padding:20px;}
+.opcao-modo{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+.opcao-modo b{font-size:14px;}
+.opcao-modo span{font-size:12px;color:var(--cinza-texto);display:block;}
+.switch{
+  width:50px;height:28px;
+  border-radius:999px;
+  background:#ddd;
+  position:relative;
+  transition:.2s;
+}
+.switch.on{background:var(--verde);}
+.switch .bola{
+  position:absolute;top:3px;left:3px;
+  width:22px;height:22px;
+  background:#fff;
+  border-radius:50%;
+  transition:.2s;
+}
+.switch.on .bola{left:25px;}
+.slider-box{
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+.slider-box .label-slider{
+  display:flex;justify-content:space-between;
+  font-size:13px;font-weight:600;margin-bottom:10px;
+}
+input[type=range]{width:100%;accent-color:var(--verde);}
+.btn-testar{
+  width:100%;
+  background:var(--verde);
+  color:#fff;
+  font-weight:700;
+  padding:14px;
+  border-radius:12px;
+  font-size:14px;
+}
+
+/* PERFIL */
+.aba-perfil{padding:20px;text-align:center;}
+.avatar-perfil{
+  font-size:56px;
+  width:100px;height:100px;
+  background:#fff;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 18px;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+}
+.stats-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+  margin-bottom:24px;
+}
+.stat-card{
+  background:#fff;
+  border-radius:14px;
+  padding:14px 8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+.stat-card .num{font-size:20px;font-weight:800;color:var(--verde);}
+.stat-card .lbl{font-size:11px;color:var(--cinza-texto);margin-top:2px;}
+.perfil-licao{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:#fff;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  text-align:left;
+}
+.perfil-licao .nome{font-size:13px;font-weight:700;margin-bottom:6px;}
+.perfil-licao .bp{flex:1;}
+
+/* BOTTOM NAV */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:#fff;
+  border-top:1px solid #eee;
+  display:flex;
+  z-index:100;
+}
+.nav-item{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  padding:10px 0 12px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--cinza-texto);
+}
+.nav-item .ic{font-size:20px;}
+.nav-item.ativo{color:var(--verde);}
+
+@media(min-width:480px){
+  .card-principal,.aba-vocab,.aba-modo,.aba-perfil{max-width:480px;margin:0 auto;}
+  .player{max-width:480px;margin:0 auto;}
+  .header-fixo{max-width:480px;margin:0 auto;}
+  .bottom-nav{max-width:480px;margin:0 auto;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TELA 1: INÍCIO ============ -->
+<div id="tela-inicio">
+  <div class="bandeira">
+    <div class="faixa-verde"></div>
+    <div class="faixa-branca"></div>
+    <div class="faixa-vermelha"></div>
+  </div>
+  <h1 class="titulo-app">Italiano no Ouvido</h1>
+  <p class="subtitulo-app">O curso de italiano que você escuta — sem precisar olhar pra tela.</p>
+  <div class="pills">
+    <div class="pill">🎧 Mãos livres</div>
+    <div class="pill">🚶 Modo caminhada</div>
+    <div class="pill">🗣️ Voz nativa</div>
+  </div>
+  <button class="btn-principal" id="btn-comecar">Começar agora</button>
+</div>
+
+<!-- ============ MODAL: ESCOLHA DE VOZ ============ -->
+<div class="overlay hidden" id="modal-voz">
+  <div class="modal">
+    <h2>Escolha sua voz</h2>
+    <p class="sub">Como você quer ouvir as frases?</p>
+
+    <div class="voz-opcao" data-voz="browser">
+      <div class="emoji">🌐</div>
+      <div class="info">
+        <b>Voz do navegador</b>
+        <span>Web Speech API — funciona offline</span>
+      </div>
+    </div>
+
+    <div class="voz-opcao" data-voz="responsivevoice">
+      <div class="emoji">☁️</div>
+      <div class="info">
+        <b>ResponsiveVoice</b>
+        <span>Online — melhor qualidade de voz</span>
+      </div>
+    </div>
+
+    <div class="voz-opcao" data-voz="texto">
+      <div class="emoji">📖</div>
+      <div class="info">
+        <b>Só texto</b>
+        <span>Sem áudio, modo leitura</span>
+      </div>
+    </div>
+
+    <button class="btn-confirmar" id="btn-confirmar-voz">Confirmar</button>
+  </div>
+</div>
+
+<!-- ============ TELA 2: APP PRINCIPAL ============ -->
+<div id="tela-app" class="hidden">
+  <div class="header-fixo">
+    <div class="logo">🇮🇹 Italiano no Ouvido</div>
+    <div class="xp-contador" id="xp-contador">0 XP</div>
+  </div>
+
+  <!-- ABA LIÇÕES -->
+  <div class="aba-conteudo ativa" id="aba-licoes">
+    <div class="player">
+      <div class="player-badge" id="player-badge">Lição 1</div>
+      <div class="player-desc" id="player-desc">Frase</div>
+      <div class="onda-box" id="onda-box">
+        <div class="barra"></div><div class="barra"></div><div class="barra"></div>
+        <div class="barra"></div><div class="barra"></div><div class="barra"></div>
+        <div class="barra"></div><div class="barra"></div><div class="barra"></div>
+      </div>
+      <div class="frase-box">
+        <div class="frase-it" id="frase-it">—</div>
+        <div class="frase-pt" id="frase-pt">—</div>
+      </div>
+      <div class="controles">
+        <button id="btn-anterior">⏮</button>
+        <button class="btn-play" id="btn-play">▶</button>
+        <button id="btn-proximo">⏭</button>
+      </div>
+    </div>
+
+    <div class="card-principal">
+      <div class="progresso-licao">
+        <div class="label">
+          <span id="nome-licao-atual">Lição 1 — Saudações</span>
+          <span id="progresso-texto">0/7</span>
+        </div>
+        <div class="barra-progresso"><div class="barra-progresso-fill" id="barra-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="lista-exercicios" id="lista-exercicios"></div>
+
+      <div class="quiz-painel hidden" id="quiz-painel">
+        <div class="pergunta" id="quiz-pergunta">Escolha a tradução correta:</div>
+        <div class="quiz-opcoes" id="quiz-opcoes"></div>
+      </div>
+
+      <div class="dica-box hidden" id="dica-box">💡 <span id="dica-texto"></span></div>
+
+      <div class="titulo-secao">Todas as lições</div>
+      <div class="grid-licoes" id="grid-licoes"></div>
+    </div>
+  </div>
+
+  <!-- ABA VOCABULÁRIO -->
+  <div class="aba-conteudo" id="aba-vocabulario">
+    <div class="aba-vocab">
+      <input type="text" class="busca-vocab" id="busca-vocab" placeholder="🔍 Buscar palavra ou frase...">
+      <div id="lista-vocab"></div>
+    </div>
+  </div>
+
+  <!-- ABA MODO -->
+  <div class="aba-conteudo" id="aba-modo">
+    <div class="aba-modo">
+      <div class="opcao-modo">
+        <div>
+          <b>Manual</b>
+          <span>Você pressiona ▶ em cada exercício</span>
+        </div>
+        <div class="switch" id="switch-manual"></div>
+      </div>
+      <div class="opcao-modo">
+        <div>
+          <b>Automático</b>
+          <span>Avança sozinho — ideal para caminhar</span>
+        </div>
+        <div class="switch" id="switch-auto"></div>
+      </div>
+
+      <div class="slider-box">
+        <div class="label-slider">
+          <span>Velocidade da voz</span>
+          <span id="valor-velocidade">1.0x</span>
+        </div>
+        <input type="range" id="slider-velocidade" min="0.5" max="1.5" step="0.1" value="1">
+      </div>
+
+      <button class="btn-testar" id="btn-testar-voz">🔊 Testar voz agora</button>
+    </div>
+  </div>
+
+  <!-- ABA PERFIL -->
+  <div class="aba-conteudo" id="aba-perfil">
+    <div class="aba-perfil">
+      <div class="avatar-perfil">🇮🇹</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="num" id="stat-xp">0</div><div class="lbl">XP Total</div></div>
+        <div class="stat-card"><div class="num" id="stat-palavras">0</div><div class="lbl">Palavras aprendidas</div></div>
+        <div class="stat-card"><div class="num" id="stat-dias">1</div><div class="lbl">Dias seguidos</div></div>
+      </div>
+      <div class="titulo-secao" style="text-align:left">Progresso por lição</div>
+      <div id="lista-perfil-licoes"></div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item ativo" data-aba="licoes"><span class="ic">📚</span>Lições</button>
+    <button class="nav-item" data-aba="vocabulario"><span class="ic">🔤</span>Vocabulário</button>
+    <button class="nav-item" data-aba="modo"><span class="ic">⚙️</span>Modo</button>
+    <button class="nav-item" data-aba="perfil"><span class="ic">👤</span>Perfil</button>
+  </div>
+</div>
+
+<script>
+/* ======================= DADOS DO CURSO ======================= */
+const LICOES = [
+  {
+    id:0, emoji:'👋', nome:'Saudações', nivel:'A1', desbloqueada:true,
+    exercicios:[
+      {tipo:'vocab', it:'Ciao', pt:'Oi / Tchau'},
+      {tipo:'vocab', it:'Buongiorno', pt:'Bom dia'},
+      {tipo:'vocab', it:'Buonasera', pt:'Boa tarde / noite'},
+      {tipo:'frase', it:'Come stai?', pt:'Como você está?', dica:'Pergunta informal usada entre amigos.'},
+      {tipo:'frase', it:'Sto bene, grazie!', pt:'Estou bem, obrigado!', dica:'"Grazie" significa "obrigado(a)" em qualquer situação.'},
+      {tipo:'quiz', it:'Arrivederci', pt:'Até logo', opcoes:['Até logo','Bom dia','Obrigado','Com licença']},
+      {tipo:'frase', it:'Piacere di conoscerti!', pt:'Prazer em te conhecer!', dica:'Usada ao conhecer alguém pela primeira vez.'}
+    ]
+  },
+  {
+    id:1, emoji:'🔢', nome:'Números', nivel:'A1', desbloqueada:true,
+    exercicios:[
+      {tipo:'vocab', it:'Uno, due, tre', pt:'Um, dois, três'},
+      {tipo:'vocab', it:'Quattro, cinque, sei', pt:'Quatro, cinco, seis'},
+      {tipo:'vocab', it:'Sette, otto, nove, dieci', pt:'Sete, oito, nove, dez'},
+      {tipo:'frase', it:'Quanti anni hai?', pt:'Quantos anos você tem?', dica:'"Quanti" varia conforme o gênero/número da palavra seguinte.'},
+      {tipo:'quiz', it:'Ho trentadue anni.', pt:'Tenho 32 anos', opcoes:['Tenho 32 anos','Tenho 22 anos','Tenho 42 anos','Tenho 12 anos']}
+    ]
+  },
+  {
+    id:2, emoji:'🙋', nome:'Apresentação', nivel:'A1', desbloqueada:true,
+    exercicios:[
+      {tipo:'frase', it:'Mi chiamo Luiz.', pt:'Meu nome é Luiz.', dica:'"Mi chiamo" literalmente significa "eu me chamo".'},
+      {tipo:'frase', it:'Sono brasiliano.', pt:'Sou brasileiro.', dica:'Para mulheres: "Sono brasiliana".'},
+      {tipo:'frase', it:'Vengo dal Brasile.', pt:'Venho do Brasil.', dica:'"Dal" é a contração de "da" + "il".'},
+      {tipo:'quiz', it:'Di dove sei?', pt:'De onde você é?', opcoes:['De onde você é?','Como se chama?','Onde mora?','Quantos anos tem?']},
+      {tipo:'frase', it:'Sono un imprenditore.', pt:'Sou empreendedor.', dica:"Para mulheres: \"Sono un'imprenditrice\"."}
+    ]
+  },
+  {
+    id:3, emoji:'☕', nome:'No café', nivel:'A1', desbloqueada:false,
+    exercicios:[
+      {tipo:'frase', it:'Un caffè, per favore.', pt:'Um café, por favor.', dica:'"Per favore" = "por favor".'},
+      {tipo:'frase', it:'Quanto costa?', pt:'Quanto custa?', dica:'Pergunta essencial para qualquer compra.'},
+      {tipo:'vocab', it:'Il conto, per favore.', pt:'A conta, por favor.'},
+      {tipo:'quiz', it:'Vorrei un cornetto.', pt:'Eu gostaria de um croissant', opcoes:['Eu gostaria de um croissant','Tenho um croissant','Quero comprar','Não quero']}
+    ]
+  },
+  {
+    id:4, emoji:'🗺️', nome:'Direções', nivel:'A2', desbloqueada:false,
+    exercicios:[
+      {tipo:'frase', it:'Dove è il bagno?', pt:'Onde fica o banheiro?', dica:'Pergunta super útil em viagens.'},
+      {tipo:'vocab', it:'A destra, a sinistra', pt:'À direita, à esquerda'},
+      {tipo:'frase', it:'Sempre dritto.', pt:'Sempre em frente.', dica:'Usada para indicar que deve seguir reto.'},
+      {tipo:'quiz', it:'Giri a destra.', pt:'Vire à direita', opcoes:['Vire à direita','Vire à esquerda','Siga em frente','Pare aqui']}
+    ]
+  }
+];
+
+/* ======================= ESTADO ======================= */
+const state = {
+  vozEngine: 'browser',
+  velocidade: 1,
+  modoAuto: false,
+  xp: 0,
+  licaoAtualId: 0,
+  exercicioAtualIdx: 0,
+  tocando: false,
+  concluidos: {},      // { "0-0": true, "0-1": true, ... }
+  licoesCompletas: {}, // { 0: true }
+  palavrasAprendidas: new Set()
+};
+
+/* ======================= MOTOR DE VOZ ======================= */
+let vozesCarregadas = [];
+if ('speechSynthesis' in window) {
+  speechSynthesis.onvoiceschanged = () => { vozesCarregadas = speechSynthesis.getVoices(); };
+  vozesCarregadas = speechSynthesis.getVoices();
+}
+
+function falar(texto, lang, callback) {
+  const vel = state.velocidade;
+
+  if (state.vozEngine === 'responsivevoice') {
+    if (window.responsiveVoice && responsiveVoice.voiceSupport()) {
+      const voz = lang.startsWith('it') ? 'Italian Female' : 'Brazilian Portuguese Female';
+      responsiveVoice.speak(texto, voz, { rate: vel, onend: callback });
+      return;
+    }
+    // fallback se RV não carregou
+    return falarBrowser(texto, lang, callback);
+  }
+
+  if (state.vozEngine === 'browser') {
+    return falarBrowser(texto, lang, callback);
+  }
+
+  // modo texto — timeout silencioso
+  setTimeout(callback, 1200);
+}
+
+function falarBrowser(texto, lang, callback) {
+  if (!('speechSynthesis' in window)) {
+    setTimeout(callback, 1200);
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(texto);
+  u.lang = lang;
+  u.rate = state.velocidade;
+  const vozes = vozesCarregadas.length ? vozesCarregadas : speechSynthesis.getVoices();
+  const voz = vozes.find(v => v.lang.startsWith(lang.split('-')[0])) || vozes[0];
+  if (voz) u.voice = voz;
+  let resolvido = false;
+  const resolver = () => { if (!resolvido) { resolvido = true; callback(); } };
+  u.onend = resolver;
+  u.onerror = resolver;
+  speechSynthesis.speak(u);
+  // fallback de segurança caso o evento não dispare
+  setTimeout(resolver, 6000);
+}
+
+function falarFraseCompleta(it, pt, aoFinalizar) {
+  setOndaTocando(true);
+  falar(it, 'it-IT', () => {
+    setTimeout(() => {
+      falar(pt, 'pt-BR', () => {
+        setTimeout(() => {
+          falar(it, 'it-IT', () => {
+            setOndaTocando(false);
+            if (aoFinalizar) aoFinalizar();
+          });
+        }, 0);
+      });
+    }, 500);
+  });
+}
+// nota: pausas de 500ms e 600ms entre as falas, conforme spec
+function falarSequencia(it, pt, aoFinalizar) {
+  setOndaTocando(true);
+  falar(it, 'it-IT', () => {
+    setTimeout(() => {
+      falar(pt, 'pt-BR', () => {
+        setTimeout(() => {
+          falar(it, 'it-IT', () => {
+            setOndaTocando(false);
+            if (aoFinalizar) aoFinalizar();
+          });
+        }, 600);
+      });
+    }, 500);
+  });
+}
+
+function setOndaTocando(tocando) {
+  document.getElementById('onda-box').classList.toggle('tocando', tocando);
+}
+
+/* ======================= NAVEGAÇÃO TELA 1 -> MODAL -> APP ======================= */
+const telaInicio = document.getElementById('tela-inicio');
+const modalVoz = document.getElementById('modal-voz');
+const telaApp = document.getElementById('tela-app');
+let vozSelecionadaTmp = 'browser';
+
+document.getElementById('btn-comecar').addEventListener('click', () => {
+  modalVoz.classList.remove('hidden');
+  document.querySelectorAll('.voz-opcao').forEach(el => {
+    el.classList.toggle('selecionada', el.dataset.voz === vozSelecionadaTmp);
+  });
+});
+
+document.querySelectorAll('.voz-opcao').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.voz-opcao').forEach(o => o.classList.remove('selecionada'));
+    el.classList.add('selecionada');
+    vozSelecionadaTmp = el.dataset.voz;
+  });
+});
+
+document.getElementById('btn-confirmar-voz').addEventListener('click', () => {
+  state.vozEngine = vozSelecionadaTmp === 'texto' ? 'texto' : vozSelecionadaTmp;
+  modalVoz.classList.add('hidden');
+  telaInicio.classList.add('hidden');
+  telaApp.classList.remove('hidden');
+  renderTudo();
+});
+
+/* ======================= BOTTOM NAV ======================= */
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('ativo'));
+    btn.classList.add('ativo');
+    document.querySelectorAll('.aba-conteudo').forEach(a => a.classList.remove('ativa'));
+    document.getElementById('aba-' + btn.dataset.aba).classList.add('ativa');
+    if (btn.dataset.aba === 'vocabulario') renderVocabulario();
+    if (btn.dataset.aba === 'perfil') renderPerfil();
+  });
+});
+
+/* ======================= HELPERS DE ESTADO ======================= */
+function getLicao(id) { return LICOES.find(l => l.id === id); }
+function chaveExercicio(licaoId, idx) { return licaoId + '-' + idx; }
+function exercicioConcluido(licaoId, idx) { return !!state.concluidos[chaveExercicio(licaoId, idx)]; }
+
+function totalConcluidosLicao(licao) {
+  return licao.exercicios.filter((_, idx) => exercicioConcluido(licao.id, idx)).length;
+}
+
+function adicionarXp(qtd) {
+  state.xp += qtd;
+  document.getElementById('xp-contador').textContent = state.xp + ' XP';
+}
+
+function marcarConcluido(licaoId, idx, xp) {
+  const chave = chaveExercicio(licaoId, idx);
+  if (!state.concluidos[chave]) {
+    state.concluidos[chave] = true;
+    adicionarXp(xp);
+    const licao = getLicao(licaoId);
+    const ex = licao.exercicios[idx];
+    state.palavrasAprendidas.add(ex.it);
+
+    if (totalConcluidosLicao(licao) === licao.exercicios.length && !state.licoesCompletas[licaoId]) {
+      state.licoesCompletas[licaoId] = true;
+      adicionarXp(50);
+      const proxima = getLicao(licaoId + 1);
+      if (proxima) proxima.desbloqueada = true;
+    }
+  }
+}
+
+/* ======================= RENDER: PLAYER + EXERCÍCIOS ======================= */
+function renderTudo() {
+  renderPlayer();
+  renderListaExercicios();
+  renderGridLicoes();
+  document.getElementById('xp-contador').textContent = state.xp + ' XP';
+}
+
+function exercicioAtual() {
+  const licao = getLicao(state.licaoAtualId);
+  return licao.exercicios[state.exercicioAtualIdx];
+}
+
+function renderPlayer() {
+  const licao = getLicao(state.licaoAtualId);
+  const ex = exercicioAtual();
+
+  document.getElementById('player-badge').textContent = 'Lição ' + (licao.id + 1) + ' — ' + licao.nome;
+  const descTipo = { vocab:'Vocabulário', frase:'Frase', quiz:'Quiz' };
+  document.getElementById('player-desc').textContent = descTipo[ex.tipo] + ' • ' + (state.exercicioAtualIdx + 1) + '/' + licao.exercicios.length;
+
+  document.getElementById('frase-it').textContent = ex.it;
+  document.getElementById('frase-pt').textContent = ex.pt;
+
+  document.getElementById('nome-licao-atual').textContent = 'Lição ' + (licao.id + 1) + ' — ' + licao.nome;
+  const total = licao.exercicios.length;
+  const concluidos = totalConcluidosLicao(licao);
+  document.getElementById('progresso-texto').textContent = concluidos + '/' + total;
+  document.getElementById('barra-fill').style.width = (concluidos / total * 100) + '%';
+
+  document.getElementById('btn-play').textContent = state.tocando ? '⏸' : '▶';
+
+  // dica
+  const dicaBox = document.getElementById('dica-box');
+  if (ex.tipo === 'frase' && ex.dica) {
+    dicaBox.classList.remove('hidden');
+    document.getElementById('dica-texto').textContent = ex.dica;
+  } else {
+    dicaBox.classList.add('hidden');
+  }
+
+  // quiz
+  const quizPainel = document.getElementById('quiz-painel');
+  if (ex.tipo === 'quiz') {
+    quizPainel.classList.remove('hidden');
+    renderQuiz(ex);
+  } else {
+    quizPainel.classList.add('hidden');
+  }
+}
+
+function renderQuiz(ex) {
+  const opcoesEl = document.getElementById('quiz-opcoes');
+  opcoesEl.innerHTML = '';
+  document.getElementById('quiz-pergunta').textContent = 'Escolha a tradução correta para: "' + ex.it + '"';
+
+  const jaConcluido = exercicioConcluido(state.licaoAtualId, state.exercicioAtualIdx);
+
+  ex.opcoes.forEach(opcao => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opcao';
+    btn.textContent = opcao;
+    if (jaConcluido && opcao === ex.pt) btn.classList.add('correta');
+    btn.addEventListener('click', () => {
+      if (exercicioConcluido(state.licaoAtualId, state.exercicioAtualIdx)) return;
+      const correta = opcao === ex.pt;
+      document.querySelectorAll('.quiz-opcao').forEach(b => b.disabled = true);
+      if (correta) {
+        btn.classList.add('correta');
+        marcarConcluido(state.licaoAtualId, state.exercicioAtualIdx, 10);
+      } else {
+        btn.classList.add('errada');
+        [...opcoesEl.children].forEach(b => { if (b.textContent === ex.pt) b.classList.add('correta'); });
+        marcarConcluido(state.licaoAtualId, state.exercicioAtualIdx, 10);
+      }
+      renderTudo();
+    });
+    opcoesEl.appendChild(btn);
+  });
+}
+
+function renderListaExercicios() {
+  const licao = getLicao(state.licaoAtualId);
+  const lista = document.getElementById('lista-exercicios');
+  lista.innerHTML = '';
+  licao.exercicios.forEach((ex, idx) => {
+    const item = document.createElement('div');
+    item.className = 'exercicio-item';
+    if (idx === state.exercicioAtualIdx) item.classList.add('ativo');
+    if (exercicioConcluido(licao.id, idx)) item.classList.add('concluido');
+
+    item.innerHTML = `
+      <div class="check">${exercicioConcluido(licao.id, idx) ? '✓' : (idx + 1)}</div>
+      <div class="txt">${ex.it}<br><span class="tipo-tag">${ex.tipo}</span></div>
+    `;
+    item.addEventListener('click', () => {
+      pausarTudo();
+      state.exercicioAtualIdx = idx;
+      renderTudo();
+    });
+    lista.appendChild(item);
+  });
+}
+
+function renderGridLicoes() {
+  const grid = document.getElementById('grid-licoes');
+  grid.innerHTML = '';
+  LICOES.forEach(licao => {
+    const card = document.createElement('div');
+    card.className = 'licao-card';
+    if (!licao.desbloqueada) card.classList.add('bloqueada');
+    if (licao.id === state.licaoAtualId) card.classList.add('atual');
+    card.innerHTML = `
+      ${!licao.desbloqueada ? '<div class="cadeado">🔒</div>' : ''}
+      <div class="emoji-licao">${licao.emoji}</div>
+      <div class="nome-licao">${licao.nome}</div>
+      <div class="nivel-licao">${licao.nivel}</div>
+    `;
+    card.addEventListener('click', () => {
+      if (!licao.desbloqueada) return;
+      pausarTudo();
+      state.licaoAtualId = licao.id;
+      state.exercicioAtualIdx = 0;
+      renderTudo();
+    });
+    grid.appendChild(card);
+  });
+}
+
+/* ======================= CONTROLES DO PLAYER ======================= */
+function pausarTudo() {
+  state.tocando = false;
+  setOndaTocando(false);
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (window.responsiveVoice) responsiveVoice.cancel();
+  document.getElementById('btn-play').textContent = '▶';
+}
+
+function tocarExercicioAtual() {
+  const licao = getLicao(state.licaoAtualId);
+  const ex = exercicioAtual();
+  state.tocando = true;
+  document.getElementById('btn-play').textContent = '⏸';
+
+  falarSequencia(ex.it, ex.pt, () => {
+    state.tocando = false;
+    document.getElementById('btn-play').textContent = '▶';
+    const xp = ex.tipo === 'quiz' ? 0 : 5; // quiz dá XP só ao responder
+    if (ex.tipo !== 'quiz') marcarConcluido(licao.id, state.exercicioAtualIdx, 5);
+    renderTudo();
+
+    if (state.modoAuto && state.exercicioAtualIdx < licao.exercicios.length - 1) {
+      state.exercicioAtualIdx++;
+      renderTudo();
+      setTimeout(() => { if (state.modoAuto) tocarExercicioAtual(); }, 800);
+    }
+  });
+}
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (state.tocando) {
+    pausarTudo();
+  } else {
+    tocarExercicioAtual();
+  }
+});
+
+document.getElementById('btn-anterior').addEventListener('click', () => {
+  pausarTudo();
+  const licao = getLicao(state.licaoAtualId);
+  state.exercicioAtualIdx = Math.max(0, state.exercicioAtualIdx - 1);
+  renderTudo();
+});
+
+document.getElementById('btn-proximo').addEventListener('click', () => {
+  pausarTudo();
+  const licao = getLicao(state.licaoAtualId);
+  state.exercicioAtualIdx = Math.min(licao.exercicios.length - 1, state.exercicioAtualIdx + 1);
+  renderTudo();
+});
+
+/* ======================= ABA VOCABULÁRIO ======================= */
+function todasFrases() {
+  const lista = [];
+  LICOES.forEach(licao => {
+    licao.exercicios.forEach(ex => {
+      lista.push({ it: ex.it, pt: ex.pt, licao: licao.nome });
+    });
+  });
+  return lista;
+}
+
+function renderVocabulario(filtro) {
+  const termo = (filtro || '').toLowerCase();
+  const lista = document.getElementById('lista-vocab');
+  lista.innerHTML = '';
+  todasFrases()
+    .filter(item => item.it.toLowerCase().includes(termo) || item.pt.toLowerCase().includes(termo))
+    .forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'vocab-item';
+      el.innerHTML = `
+        <div class="texto"><b>${item.it}</b><span>${item.pt}</span></div>
+        <div class="icone-falar">🔊</div>
+      `;
+      el.addEventListener('click', () => {
+        falar(item.it, 'it-IT', () => {});
+      });
+      lista.appendChild(el);
+    });
+}
+
+document.getElementById('busca-vocab').addEventListener('input', e => {
+  renderVocabulario(e.target.value);
+});
+
+/* ======================= ABA MODO ======================= */
+function atualizarSwitchesModo() {
+  document.getElementById('switch-manual').classList.toggle('on', !state.modoAuto);
+  document.getElementById('switch-auto').classList.toggle('on', state.modoAuto);
+}
+
+document.getElementById('switch-manual').addEventListener('click', () => {
+  state.modoAuto = false;
+  atualizarSwitchesModo();
+});
+document.getElementById('switch-auto').addEventListener('click', () => {
+  state.modoAuto = true;
+  atualizarSwitchesModo();
+});
+atualizarSwitchesModo();
+
+document.getElementById('slider-velocidade').addEventListener('input', e => {
+  state.velocidade = parseFloat(e.target.value);
+  document.getElementById('valor-velocidade').textContent = state.velocidade.toFixed(1) + 'x';
+});
+
+document.getElementById('btn-testar-voz').addEventListener('click', () => {
+  falar('Ciao! Come stai?', 'it-IT', () => {});
+});
+
+/* ======================= ABA PERFIL ======================= */
+function renderPerfil() {
+  document.getElementById('stat-xp').textContent = state.xp;
+  document.getElementById('stat-palavras').textContent = state.palavrasAprendidas.size;
+  document.getElementById('stat-dias').textContent = 1;
+
+  const lista = document.getElementById('lista-perfil-licoes');
+  lista.innerHTML = '';
+  LICOES.forEach(licao => {
+    const concluidos = totalConcluidosLicao(licao);
+    const total = licao.exercicios.length;
+    const pct = Math.round(concluidos / total * 100);
+    const el = document.createElement('div');
+    el.className = 'perfil-licao';
+    el.innerHTML = `
+      <div style="font-size:22px">${licao.emoji}</div>
+      <div class="bp">
+        <div class="nome">${licao.nome} (${concluidos}/${total})</div>
+        <div class="barra-progresso"><div class="barra-progresso-fill" style="width:${pct}%"></div></div>
+      </div>
+    `;
+    lista.appendChild(el);
+  });
+}
+
+/* ======================= INIT ======================= */
+renderListaExercicios();
+renderGridLicoes();
+</script>
+</body>
+</html>
